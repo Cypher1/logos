@@ -25,6 +25,8 @@ packages = [
 
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.20.0"
+black = "^26.3.1"
+ruff = "^0.15.10"
 
 [tool.poetry.scripts]
 logos = "logos.cli:main"

@@ -28,7 +28,7 @@ class IndentedRenderable:
 
 
 def render_function(function: Message.ToolCall.Function) -> str:
-    args = ", ".join(f"{k}={v!r}" for k,v in function.arguments.items())
+    args = ", ".join(f"{k}={v!r}" for k, v in function.arguments.items())
     return f"{function.name}({args})"
 
 
@@ -37,16 +37,16 @@ class Bot:
     model: str
     messages: list[Message] = field(default_factory=list)
     tools: dict[str, Callable] = field(default_factory=dict)
-    think: bool | Literal['low', 'medium', 'high'] = True
+    think: bool | Literal["low", "medium", "high"] = True
 
-    def add_tool(self, func) -> 'Bot':
+    def add_tool(self, func) -> "Bot":
         self.tools[func.__name__] = func
         return self
 
     def load_state(self, state_file: Path) -> None:
         try:
             print("Loading...")
-            with open(state_file, 'r') as f:
+            with open(state_file, "r") as f:
                 data = load(f)
             for obj in data:
                 self.messages.append(Message(**obj))
@@ -60,18 +60,25 @@ class Bot:
     def save_state(self, state_file: Path) -> None:
         print("Saving...")
         data = [dict(message) for message in self.messages]
-        with open(state_file, 'w') as f:
+        with open(state_file, "w") as f:
             dump(data, f)
         print("Done")
 
-    def add_message(self, role: str, content: str, tool_name: str | None = None) -> 'Bot':
-        self.messages.append(Message(role=role, content= content, tool_name=tool_name))
+    def add_message(
+        self, role: str, content: str, tool_name: str | None = None
+    ) -> "Bot":
+        self.messages.append(Message(role=role, content=content, tool_name=tool_name))
         return self
 
     def get_response(self) -> ChatResponse:
         # The python client automatically parses functions as a tool schema so we can pass them directly
         # Schemas can be passed directly in the tools list as well
-        response = chat(model=self.model, messages=self.messages, tools=list(self.tools.values()), think=self.think)
+        response = chat(
+            model=self.model,
+            messages=self.messages,
+            tools=list(self.tools.values()),
+            think=self.think,
+        )
         self.messages.append(response.message)
         self.process_tool_calls(response.message)
         return response
@@ -87,27 +94,27 @@ class Bot:
             if tool:
                 result = tool(**call.function.arguments)
             else:
-                result = 'Unknown tool'
+                result = "Unknown tool"
             # add the tool result to the messages
             func = render_function(call.function)
             result = f"{func} = {result!r}"
-            self.add_message('tool', result, tool_name = call.function.name)
+            self.add_message("tool", result, tool_name=call.function.name)
 
     def render_message(self, console, message: Message):
         if message.tool_name and message.content:
             out = Syntax(message.content, "python", theme="monokai")
             out = IndentedRenderable(out, 1)
-            console.print(out, style='red')
+            console.print(out, style="red")
         else:
             if message.thinking:
-                console.print(message.role, style='red')
+                console.print(message.role, style="red")
                 out = message.thinking
                 out = IndentedRenderable(out, 1)
-                console.print(out, style='yellow')
+                console.print(out, style="yellow")
             if message.content:
-                console.print(message.role, style='red')
+                console.print(message.role, style="red")
                 out = Markdown(message.content)
                 out = IndentedRenderable(out, 1)
-                console.print(out, style='green')
+                console.print(out, style="green")
         if message.images:
-            console.print(message.images, style='red')
+            console.print(message.images, style="red")
