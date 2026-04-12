@@ -10,6 +10,7 @@ from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
 
+
 @dataclass
 class IndentedRenderable:
     renderable: ConsoleRenderable | str
@@ -26,10 +27,10 @@ class IndentedRenderable:
             yield Segment("\n")
 
 
-
 def render_function(function: Message.ToolCall.Function) -> str:
     args = ", ".join(f"{k}={v!r}" for k,v in function.arguments.items())
     return f"{function.name}({args})"
+
 
 @dataclass
 class Bot:
