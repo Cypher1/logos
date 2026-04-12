@@ -1,11 +1,11 @@
 import sys
 from pathlib import Path
-from prompt_toolkit import PromptSession
 
+from prompt_toolkit import PromptSession
 from rich.console import Console
 
-from logos.bot import Bot
 import logos.tools as tools
+from logos.bot import Bot
 
 MODEL = "gemma4:latest"
 

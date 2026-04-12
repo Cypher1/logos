@@ -1,11 +1,12 @@
-from json import dump, load, decoder
-from pathlib import Path
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from json import decoder, dump, load
+from pathlib import Path
 from typing import Literal
 
 from ollama import ChatResponse, Message, chat
-from rich.console import Console, ConsoleOptions, ConsoleRenderable, RenderResult
+from rich.console import (Console, ConsoleOptions, ConsoleRenderable,
+                          RenderResult)
 from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax

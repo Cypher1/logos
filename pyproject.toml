@@ -27,6 +27,7 @@ packages = [
 mypy = "^1.20.0"
 black = "^26.3.1"
 ruff = "^0.15.10"
+isort = "^8.0.1"
 
 [tool.poetry.scripts]
 logos = "logos.cli:main"
