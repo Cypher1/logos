@@ -150,7 +150,7 @@ class Bot:
             console.print(message.images, style='red')
 
 
-def run():
+def main():
     console = Console()
     session = PromptSession()
 
@@ -188,7 +188,7 @@ def run():
 
 
 if __name__ == '__main__':
-    run()
+    main()
 
 
 test_prompt = """

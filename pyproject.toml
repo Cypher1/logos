@@ -10,14 +10,21 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "ollama (>=0.6.1,<0.7.0)",
-    "rich (>=14.3.4,<15.0.0)"
+    "rich (>=14.3.4,<15.0.0)",
+    "prompt-toolkit (>=3.0.52,<4.0.0)"
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.poetry]
+packages = [
+    { include = "src", format = ["sdist"] }
+]
+
 [tool.poetry.group.dev.dependencies]
 mypy = "^1.20.0"
 
+[tool.poetry.scripts]
+logos = "src.cli:main"
