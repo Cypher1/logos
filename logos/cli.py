@@ -45,7 +45,3 @@ def main():
             # Then quit
 
     assistant.save_state(state_file)
-
-
-if __name__ == '__main__':
-    main()
