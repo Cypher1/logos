@@ -40,7 +40,13 @@ class Bot:
     tools: dict[str, Callable] = field(default_factory=dict)
     think: bool | Literal["low", "medium", "high"] = True
 
-    def add_tool(self, func) -> "Bot":
+    def add_tool(self, func, instance=None) -> "Bot":
+        if instance:
+            def impl(*args, **kwargs) -> str:
+                return func(self, *args, **kwargs)
+            name = func.__name__
+            func = impl
+            func.__name__ = name
         self.tools[func.__name__] = func
         return self
 

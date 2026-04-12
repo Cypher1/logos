@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import os
 
 from prompt_toolkit import PromptSession
 from rich.console import Console
@@ -14,12 +15,21 @@ def main():
     console = Console()
     session = PromptSession()
 
-    assistant = (
-        Bot(MODEL).add_tool(tools.get_temperature).add_tool(tools.get_conditions)
-    )
-
     # Load in the previous session
-    state_file = Path.home() / ".logos.jsonl"
+    logos_dir = Path.home() / ".logos"
+
+    os.mkdir(logos_dir)
+
+    memory_file = logos_dir / "memory"
+    state_file = logos_dir / "chat.json"
+
+    memory = tools.Memory(memory_file)
+    assistant = Bot(MODEL)
+    assistant.add_tool(tools.Memory.read_memory, instance=memory)
+    assistant.add_tool(tools.Memory.add_to_memory, instance=memory)
+    assistant.add_tool(tools.get_temperature)
+    assistant.add_tool(tools.get_conditions)
+
     assistant.load_state(state_file)
 
     while True:
