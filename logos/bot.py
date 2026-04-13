@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from json import decoder, dumps, loads
+from functools import partial, wraps
+import inspect
 from pathlib import Path
 from typing import Literal
 
@@ -44,15 +45,22 @@ class Bot:
     think: bool | Literal["low", "medium", "high"] = True
 
     def add_tool(self, func, instance=None, namespace=None) -> "Bot":
+        name = f"{func.__name__}"
         if instance:
-            def impl(*args, **kwargs) -> str:
-                return func(self, *args, **kwargs)
-            name = f"{func.__name__}"
+            # impl.__dict__['__signature__'] = inspect.signature(func)
+            impl = partial(func, instance)
             if namespace:
-                name = f"{namespace}.{name}"
+                name = f"{namespace}_{name}"
+            # For some reason 'wraps' doesn't do this.
+            #from functools import WRAPPER_ASSIGNMENTS
+            impl.__annotations__ = func.__annotations__
+            impl.__doc__ = func.__doc__
+            impl.__dict__['__name__'] = name
             func = impl
-            func.__name__ = name
-        self.tools[func.__name__] = func
+        if name in self.tools:
+            # TODO: Handle this?
+            raise Exception(f" Bot already has tool for name '{name}'")
+        self.tools[name] = func
         return self
 
     def load_state(self) -> None:
@@ -61,28 +69,31 @@ class Bot:
             with open(self.state_file, "r") as f:
                 # TODO: Only load the last N messages
                 for line in f:
-                    data = loads(line)
-                    self.messages.append(Message(**data))
+                    data = from_json(line)
+                    if not isinstance(data, Message):
+                        raise Exception(f"No parse: {line}")
+                    self.messages.append(data)
         except FileNotFoundError:
             # No previous state
-            return
-        except decoder.JSONDecodeError:
-            # Start fresh
             return
 
     def save_state(self) -> None:
         print("Saving...")
-        data = [dumps(dict(message)) for message in self.messages]
+        data = [to_json(message) for message in self.messages]
         with open(self.state_file, "w") as f:
             f.writelines(data)
+            f.flush()
+            f.close()
         print("Done")
 
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
         try:
-            data = dumps(dict(message))
-            with open(self.state_file, "wa") as f:
-                f.writelines([data])
+            data = to_json(message)
+            with open(self.state_file, "a") as f:
+                f.write(data+"\n")
+                f.flush()
+                f.close()
         except FileNotFoundError:
             print(f"State file missing {self.state_file}")
 
@@ -99,7 +110,7 @@ class Bot:
         self.process_tool_calls(response.message)
         return response
 
-    def process_tool_calls(self, message) -> None:
+    def process_tool_calls(self, message: Message) -> None:
         if not message.tool_calls:
             return
 
@@ -116,7 +127,7 @@ class Bot:
             result = f"{func} = {result!r}"
             self.add_message(Message(role="tool", content=result, tool_name=call.function.name))
 
-    def render_message(self, console, message: Message):
+    def render_message(self, console: Console, message: Message):
         if message.tool_name and message.content:
             out = Syntax(message.content, "python", theme="monokai")
             out = IndentedRenderable(out, 1)
@@ -132,5 +143,11 @@ class Bot:
                 out = Markdown(message.content)
                 out = IndentedRenderable(out, 1)
                 console.print(out, style="green")
+            if message.tool_calls:
+                out = "tool_calls"
+                console.print(out, style="red")
+                out = "\n".join("\t"+render_function(call.function) for call in message.tool_calls)
+                out = IndentedRenderable(out, 1)
+                console.print(out, style="yellow")
         if message.images:
             console.print(message.images, style="red")

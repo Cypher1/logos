@@ -1,3 +1,4 @@
+import inspect
 import sys
 from pathlib import Path
 import os
@@ -24,15 +25,20 @@ def main():
 
     assistant = Bot(MODEL, state_file = session_dir / "chat.jsonl")
 
-    main_memory = tools.Memory(session_dir / "memory")
-    assistant.add_tool(tools.Memory.read_memory, instance=main_memory, namespace="main_memory")
-    assistant.add_tool(tools.Memory.write_memory, instance=main_memory, namespace="main_memory")
-    assistant.add_tool(tools.Memory.list_memories, instance=main_memory, namespace="main_memory")
+    _main = tools.Memory(session_dir / "memory")
+    assistant.add_tool(tools.Memory.read_memory, instance=_main, namespace="main")
+    assistant.add_tool(tools.Memory.write_memory, instance=_main, namespace="main")
+    assistant.add_tool(tools.Memory.list_memories, instance=_main, namespace="main")
 
-    repo_memory = tools.Memory(session_dir / "tako")
-    assistant.add_tool(tools.Memory.read_memory, instance=repo_memory, namespace="repo_memory")
-    assistant.add_tool(tools.Memory.write_memory, instance=repo_memory, namespace="repo_memory")
-    assistant.add_tool(tools.Memory.list_memories, instance=repo_memory, namespace="repo_memory")
+    repo = tools.Memory(session_dir / "tako")
+    assistant.add_tool(tools.Memory.read_memory, instance=repo, namespace="repo")
+    assistant.add_tool(tools.Memory.write_memory, instance=repo, namespace="repo")
+    assistant.add_tool(tools.Memory.list_memories, instance=repo, namespace="repo")
+
+    notes = tools.Memory(session_dir / "notes")
+    assistant.add_tool(tools.Memory.read_memory, instance=notes, namespace="notes")
+    assistant.add_tool(tools.Memory.write_memory, instance=notes, namespace="notes")
+    assistant.add_tool(tools.Memory.list_memories, instance=notes, namespace="notes")
 
     assistant.add_tool(tools.get_temperature)
     assistant.add_tool(tools.get_conditions)
@@ -55,7 +61,11 @@ def main():
                     if response == "/model":
                         console.print(assistant.model, style="yellow")
                     if response == "/tools":
-                        console.print("\n".join(assistant.tools.keys()), style="yellow")
+                        for k, v in assistant.tools.items():
+                            console.print(k, style="red", end="")
+                            console.print(f"{inspect.signature(v)}", style="yellow", end="")
+                            doc = f"  # {v.__doc__}" if v.__doc__ is not None else ""
+                            console.print(doc, style="green")
                     elif response == "/save":
                         assistant.save_state()
                     elif response == "/load":
@@ -72,6 +82,8 @@ def main():
             break
         except Exception as e:
             print(e, file=sys.stderr)
+            raise e
+            break
             # Then quit
 
     # No longer needed as messages are added one by one.
