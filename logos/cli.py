@@ -45,6 +45,8 @@ def main():
 
     assistant.load_state()
 
+    user_interrupt = True
+
     while True:
         try:
             console.clear()
@@ -55,9 +57,15 @@ def main():
             if last is None or (
                 last.role != "user" and last.role != "tool" and last.content
             ):
+                user_interrupt = True
+
+            if user_interrupt:
+                user_interrupt = False
                 console.print("user", style="red")
                 response = "/"
                 while response.startswith("/"):
+                    if response == "/quit":
+                        break
                     if response == "/model":
                         console.print(assistant.model, style="yellow")
                     if response == "/tools":
@@ -77,13 +85,14 @@ def main():
             else:
                 assistant.get_response()
         except KeyboardInterrupt:
-            break
+            user_interrupt = True
+            print("Allowing interrupt (use Control-D for quit)")
         except EOFError:
             break
         except Exception as e:
             print(e, file=sys.stderr)
             raise e
-            break
+            # break
             # Then quit
 
     # No longer needed as messages are added one by one.
