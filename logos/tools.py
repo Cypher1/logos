@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import os
 
+from logos.safety_checks import safe_open, safe_open_binary
+
 def get_temperature(city: str) -> str:
     """Get the current temperature for a city
 
@@ -32,7 +34,7 @@ class Memory:
     dir: Path
 
     def __post_init__(self):
-        os.mkdir(self.dir)
+        os.makedirs(self.dir, exist_ok=True)
 
     def list_memories(self) -> str:
         print(f"Listing memories {self.dir}...")
@@ -44,17 +46,32 @@ class Memory:
             break
         return "\n".join(f)
 
-    def read_memory(self, name: str) -> str:
-        print(f"Reading memory {self.dir / self.name}...")
+    def read_memory(self, name: str) -> str | None:
+        print(f"Reading memory {self.dir / name}...")
         try:
-            with open(self.dir / f"{name}.json", "r") as f:
+            with safe_open(self.dir / f"{name}", "r", self.dir) as f:
                 data = f.read()
             return data
         except FileNotFoundError:
-            return f"No memory file {name}"
+            return None
 
-    def add_to_memory(self, name: str, data: str) -> str:
+    def write_memory(self, name: str, data: str) -> bool:
         print(f"Saving {self.dir / name}...")
-        with open(self.dir / f"{name}.json", "w") as f:
+        with safe_open(self.dir / f"{name}", "w", self.dir) as f:
             f.write(data)
-        return "Done"
+        return True
+
+    def read_memory_bytes(self, name: str) -> bytes | None:
+        print(f"Reading binary memory {self.dir / name}...")
+        try:
+            with safe_open_binary(self.dir / f"{name}", "rb", self.dir) as f:
+                data = f.read()
+            return data
+        except FileNotFoundError:
+            return None
+
+    def write_memory_bytes(self, name: str, data: bytes) -> bool:
+        print(f"Saving {self.dir / name}...")
+        with safe_open_binary(self.dir / f"{name}", "wb", self.dir) as f:
+            f.write(data)
+        return True

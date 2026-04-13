@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from json import decoder, dump, load
+from json import decoder, dumps, loads
 from pathlib import Path
 from typing import Literal
 
@@ -10,6 +10,8 @@ from rich.console import (Console, ConsoleOptions, ConsoleRenderable,
 from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
+
+from logos.serializers import to_json, from_json
 
 
 @dataclass
@@ -36,27 +38,31 @@ def render_function(function: Message.ToolCall.Function) -> str:
 @dataclass
 class Bot:
     model: str
+    state_file: Path
     messages: list[Message] = field(default_factory=list)
     tools: dict[str, Callable] = field(default_factory=dict)
     think: bool | Literal["low", "medium", "high"] = True
 
-    def add_tool(self, func, instance=None) -> "Bot":
+    def add_tool(self, func, instance=None, namespace=None) -> "Bot":
         if instance:
             def impl(*args, **kwargs) -> str:
                 return func(self, *args, **kwargs)
-            name = func.__name__
+            name = f"{func.__name__}"
+            if namespace:
+                name = f"{namespace}.{name}"
             func = impl
             func.__name__ = name
         self.tools[func.__name__] = func
         return self
 
-    def load_state(self, state_file: Path) -> None:
+    def load_state(self) -> None:
         try:
             print("Loading...")
-            with open(state_file, "r") as f:
-                data = load(f)
-            for obj in data:
-                self.messages.append(Message(**obj))
+            with open(self.state_file, "r") as f:
+                # TODO: Only load the last N messages
+                for line in f:
+                    data = loads(line)
+                    self.messages.append(Message(**data))
         except FileNotFoundError:
             # No previous state
             return
@@ -64,18 +70,21 @@ class Bot:
             # Start fresh
             return
 
-    def save_state(self, state_file: Path) -> None:
+    def save_state(self) -> None:
         print("Saving...")
-        data = [dict(message) for message in self.messages]
-        with open(state_file, "w") as f:
-            dump(data, f)
+        data = [dumps(dict(message)) for message in self.messages]
+        with open(self.state_file, "w") as f:
+            f.writelines(data)
         print("Done")
 
-    def add_message(
-        self, role: str, content: str, tool_name: str | None = None
-    ) -> "Bot":
-        self.messages.append(Message(role=role, content=content, tool_name=tool_name))
-        return self
+    def add_message(self, message: Message) -> None:
+        self.messages.append(message)
+        try:
+            data = dumps(dict(message))
+            with open(self.state_file, "wa") as f:
+                f.writelines([data])
+        except FileNotFoundError:
+            print(f"State file missing {self.state_file}")
 
     def get_response(self) -> ChatResponse:
         # The python client automatically parses functions as a tool schema so we can pass them directly
@@ -86,7 +95,7 @@ class Bot:
             tools=list(self.tools.values()),
             think=self.think,
         )
-        self.messages.append(response.message)
+        self.add_message(response.message)
         self.process_tool_calls(response.message)
         return response
 
@@ -105,7 +114,7 @@ class Bot:
             # add the tool result to the messages
             func = render_function(call.function)
             result = f"{func} = {result!r}"
-            self.add_message("tool", result, tool_name=call.function.name)
+            self.add_message(Message(role="tool", content=result, tool_name=call.function.name))
 
     def render_message(self, console, message: Message):
         if message.tool_name and message.content:
