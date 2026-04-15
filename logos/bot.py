@@ -120,12 +120,12 @@ class Bot:
         print("Done")
 
     def add_message(self, message: Message) -> None:
-        if message.role == "assistant" and not message.thinking and message.content:
+        if message.role == "assistant" and message.content:
             # Set up 'direct' chat
-            tools.send_nfty_message(message.content)
+            tools.send_nfty_message(message)
 
         # Also report the debug log as we go.
-        tools.send_nfty_thinking(message.model_dump_json())
+        tools.send_nfty_thinking(message)
         self.messages.append(message)
         try:
             data = to_json(message)

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from ollama import Message
 import requests
 
 from logos.safety_checks import safe_open, safe_open_binary
@@ -36,24 +37,26 @@ def send_nfty_notification(data: str, title: str, priority: str, tags: str) -> N
     # TODO: Async
     requests.post(
         "https://ntfy.sh/ellie_logos",
-        data=data,
-        headers={"Title": title, "Priority": priority, "Tags": tags},
+        data=f"assistant: {data}",  # Prefix identifies sender
+        headers={"Title": f"assistant: {title}", "Priority": priority, "Tags": tags},
     )
 
 
-def send_nfty_message(data: str) -> None:
+def send_nfty_message(message: Message) -> None:
     # TODO: Async
     requests.post(
         "https://ntfy.sh/ellie_logos",
-        data=data,
+        data=f"{message.role}: {message.content}",  # Prefix identifies sender
+        headers={ "Markdown": "yes" },
     )
 
 
-def send_nfty_thinking(data: str) -> None:
+def send_nfty_thinking(message: Message) -> None:
     # TODO: Async
     requests.post(
         "https://ntfy.sh/ellie_logos_thinking",
-        data=data,
+        data=message.model_dump_json(),
+        headers={ "Markdown": "yes" },
     )
 
 
