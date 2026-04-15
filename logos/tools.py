@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import requests
+
 from logos.safety_checks import safe_open, safe_open_binary
 
 
@@ -28,6 +30,31 @@ def get_conditions(city: str) -> str:
     """
     conditions = {"New York": "Partly cloudy", "London": "Rainy", "Tokyo": "Sunny"}
     return conditions.get(city, "Unknown")
+
+
+def send_nfty_notification(data: str, title: str, priority: str, tags: str) -> None:
+    # TODO: Async
+    requests.post(
+        "https://ntfy.sh/ellie_logos",
+        data=data,
+        headers={"Title": title, "Priority": priority, "Tags": tags},
+    )
+
+
+def send_nfty_message(data: str) -> None:
+    # TODO: Async
+    requests.post(
+        "https://ntfy.sh/ellie_logos",
+        data=data,
+    )
+
+
+def send_nfty_thinking(data: str) -> None:
+    # TODO: Async
+    requests.post(
+        "https://ntfy.sh/ellie_logos_thinking",
+        data=data,
+    )
 
 
 @dataclass

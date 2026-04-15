@@ -10,6 +10,7 @@ from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
 
+from logos import tools
 from logos.serializers import from_json, to_json
 
 DEFAULT_MODEL = "gemma4:latest"
@@ -119,6 +120,12 @@ class Bot:
         print("Done")
 
     def add_message(self, message: Message) -> None:
+        if message.role == "assistant" and not message.thinking and message.content:
+            # Set up 'direct' chat
+            tools.send_nfty_message(message.content)
+
+        # Also report the debug log as we go.
+        tools.send_nfty_thinking(message.model_dump_json())
         self.messages.append(message)
         try:
             data = to_json(message)

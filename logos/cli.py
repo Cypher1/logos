@@ -41,6 +41,9 @@ def main():
     assistant.add_tool(tools.get_temperature)
     assistant.add_tool(tools.get_conditions)
 
+    # So that Logos can message directly
+    assistant.add_tool(tools.send_nfty_notification)
+
     assistant.load_state()
 
     user_interrupt = True
