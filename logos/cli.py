@@ -19,7 +19,7 @@ def main():
 
     # Load in the previous session
     logos_dir = Path.home() / ".logos"
-    logos_dir.mkdir(parents=True)
+    logos_dir.mkdir(parents=True, exist_ok=True)
 
     session_dir = logos_dir / "latest"
 

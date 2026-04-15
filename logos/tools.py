@@ -91,7 +91,7 @@ class ReadDir:
 @dataclass
 class ReadWriteDir(ReadDir):
     def __post_init__(self):
-        self.dir.mkdir(parents=True)
+        self.dir.mkdir(parents=True, exist_ok=True)
 
     def write(self, name: str, data: str) -> bool:
         print(f"Writing {self.dir / name}...")
