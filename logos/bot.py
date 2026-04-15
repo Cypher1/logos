@@ -2,7 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal, Set
+from typing import Any, Literal
 
 from ollama import ChatResponse, Message, chat
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, RenderResult
@@ -22,7 +22,9 @@ class IndentedRenderable:
     indent: int
 
     def __rich_console__(
-        self, console: Console, options: ConsoleOptions
+        self,
+        console: Console,
+        options: ConsoleOptions,
     ) -> RenderResult:
         segments = console.render(self.renderable, options)
         lines = Segment.split_lines(segments)
@@ -49,13 +51,13 @@ class Bot:
     messages: list[Message] = field(default_factory=list)
 
     @classmethod
-    def skip_fields(cls) -> Set[str]:
+    def skip_fields(cls) -> set[str]:
         return {"tool_set", "messages"}
 
     def set(self, key, value: str):
         if key in Bot.skip_fields():
             raise ValueError(key)
-        elif key == "think":
+        if key == "think":
             value = value.lower()
             if value == "true":
                 setattr(self, key, True)
@@ -96,7 +98,7 @@ class Bot:
     def load_state(self) -> None:
         try:
             print("Loading...")
-            with open(self.state_file, "r") as f:
+            with self.state_file.open() as f:
                 # TODO: Only load the last N messages
                 for line in f:
                     data = from_json(line)
@@ -110,7 +112,7 @@ class Bot:
     def save_state(self) -> None:
         print("Saving...")
         data = [to_json(message) for message in self.messages]
-        with open(self.state_file, "w") as f:
+        with self.state_file.open("w") as f:
             f.writelines(data)
             f.flush()
             f.close()
@@ -120,7 +122,7 @@ class Bot:
         self.messages.append(message)
         try:
             data = to_json(message)
-            with open(self.state_file, "a") as f:
+            with self.state_file.open("a") as f:
                 f.write(data + "\n")
                 f.flush()
                 f.close()
@@ -152,15 +154,12 @@ class Bot:
             # execute the appropriate tool
             # TODO: Async
             tool = self.tool_set.get(call.function.name)
-            if tool:
-                result = tool(**call.function.arguments)
-            else:
-                result = "Unknown tool"
+            result = tool(**call.function.arguments) if tool else "Unknown tool"
             # add the tool result to the messages
             func = render_function(call.function)
             result = f"{func} = {result!r}"
             self.add_message(
-                Message(role="tool", content=result, tool_name=call.function.name)
+                Message(role="tool", content=result, tool_name=call.function.name),
             )
 
     def render_message(self, console: Console, message: Message):
@@ -183,9 +182,7 @@ class Bot:
             if message.tool_calls:
                 out = "tool_calls"
                 console.print(out, style="red")
-                out = "\n".join(
-                    "\t" + render_function(call.function) for call in message.tool_calls
-                )
+                out = "\n".join("\t" + render_function(call.function) for call in message.tool_calls)
                 out = IndentedRenderable(out, 1)
                 console.print(out, style="yellow")
         if message.images:

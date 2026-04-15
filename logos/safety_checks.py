@@ -1,5 +1,4 @@
 from io import TextIOWrapper
-from os.path import abspath
 from pathlib import Path
 from typing import TYPE_CHECKING, BinaryIO
 
@@ -20,7 +19,7 @@ def validate_requested_file_path(*, requested_path: Path, contained_directory: P
     #
     # For more information see:
     # https://salvatoresecurity.com/preventing-directory-traversal-vulnerabilities-in-python/
-    if contained_directory not in Path(abspath(requested_path)).parents:
+    if contained_directory not in requested_path.resolve().parents:
         raise ForbiddenPathError(
             f"The requested path '{requested_path}' is forbidden",
             requested_path=requested_path,
@@ -36,20 +35,26 @@ def safe_append(path: Path, contained_directory: Path) -> TextIOWrapper:
 
 
 def safe_open(
-    path: Path, mode: "OpenTextMode", contained_directory: Path
+    path: Path,
+    mode: "OpenTextMode",
+    contained_directory: Path,
 ) -> TextIOWrapper:
     # TODO: Test
     validate_requested_file_path(
-        requested_path=path, contained_directory=contained_directory
+        requested_path=path,
+        contained_directory=contained_directory,
     )
-    return open(path, mode)
+    return path.open(mode)
 
 
 def safe_open_binary(
-    path: Path, mode: "OpenBinaryMode", contained_directory: Path
+    path: Path,
+    mode: "OpenBinaryMode",
+    contained_directory: Path,
 ) -> BinaryIO:
     # TODO: Test
     validate_requested_file_path(
-        requested_path=path, contained_directory=contained_directory
+        requested_path=path,
+        contained_directory=contained_directory,
     )
-    return open(path, mode)
+    return path.open(mode)

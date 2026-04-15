@@ -1,4 +1,3 @@
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -36,7 +35,7 @@ class Memory:
     dir: Path
 
     def __post_init__(self):
-        os.makedirs(self.dir, exist_ok=True)
+        self.dir.mkdir(parents=True)
 
     def list_memories(self) -> str:
         print(f"Listing memories {self.dir}...")
@@ -52,8 +51,7 @@ class Memory:
         print(f"Reading memory {self.dir / name}...")
         try:
             with safe_open(self.dir / f"{name}", "r", self.dir) as f:
-                data = f.read()
-            return data
+                return f.read()
         except FileNotFoundError:
             return None
 
@@ -67,8 +65,7 @@ class Memory:
         print(f"Reading binary memory {self.dir / name}...")
         try:
             with safe_open_binary(self.dir / f"{name}", "rb", self.dir) as f:
-                data = f.read()
-            return data
+                return f.read()
         except FileNotFoundError:
             return None
 

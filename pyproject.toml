@@ -24,10 +24,40 @@ packages = [
 ]
 
 [tool.poetry.group.dev.dependencies]
-mypy = "^1.20.0"
-black = "^26.3.1"
 ruff = "^0.15.10"
-isort = "^8.0.1"
+ty = "^0.0.30"
 
 [tool.poetry.scripts]
 logos = "logos.cli:main"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+extend-select = [
+    "F",   # Pyflakes rules
+    "W",   # PyCodeStyle warnings
+    "E",   # PyCodeStyle errors
+    "I",   # Sort imports properly
+    "UP",  # Warn if certain things can changed due to newer Python versions
+    "C4",  # Catch incorrect use of comprehensions, dict, list, etc
+    "FA",  # Enforce from __future__ import annotations
+    "ISC", # Good use of string concatenation
+    "ICN", # Use common import conventions
+    "RET", # Good return practices
+    "SIM", # Common simplification rules
+    "TID", # Some good import practices
+    "TC",  # Enforce importing certain types in a TYPE_CHECKING block
+    "PTH", # Use pathlib instead of os.path
+    "TD",  # Be diligent with TODO comments
+    "NPY", # Some numpy-specific things
+    "COM", # enforce trailing comma rules
+    "DTZ", # require strict timezone manipulation with datetime
+    "FBT", # detect boolean traps
+    "N",   # enforce naming conventions, e.g. ClassName vs function_name
+]
+ignore = [
+    "TD002",  # For now there's only one developer.
+    "TD003",  # For now there's no need to file issues for every TODO.
+    "COM812", # I like trailing commas for consistency.
+]

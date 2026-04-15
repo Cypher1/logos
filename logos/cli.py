@@ -1,5 +1,4 @@
 import inspect
-import os
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -20,7 +19,7 @@ def main():
 
     # Load in the previous session
     logos_dir = Path.home() / ".logos"
-    os.makedirs(logos_dir, exist_ok=True)
+    logos_dir.mkdir(parents=True)
 
     session_dir = logos_dir / "latest"
 
@@ -55,9 +54,7 @@ def main():
                 assistant.render_message(console, message)
 
             last = assistant.messages[-1] if assistant.messages else None
-            if last is None or (
-                last.role != "user" and last.role != "tool" and last.content
-            ):
+            if last is None or (last.role != "user" and last.role != "tool" and last.content):
                 user_interrupt = True
 
             if user_interrupt:
@@ -71,13 +68,15 @@ def main():
                     command = args.pop(0)
                     if command == "quit":
                         break
-                    elif command == "model":
+                    if command == "model":
                         console.print(assistant.model, style="yellow")
                     elif command == "tools":
-                        for k, v in assistant.tools.items():
+                        for k, v in assistant.tool_set.items():
                             console.print(k, style="red", end="")
                             console.print(
-                                f"{inspect.signature(v)}", style="yellow", end=""
+                                f"{inspect.signature(v)}",
+                                style="yellow",
+                                end="",
                             )
                             doc = f"  # {v.__doc__}" if v.__doc__ is not None else ""
                             console.print(doc, style="green")

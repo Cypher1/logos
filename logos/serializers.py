@@ -7,16 +7,19 @@ from pydantic import ValidationError
 
 def has_all_keys(json_object: dict, keys: list[str]):
     # TODO: Tests
-    return all([k in json_object for k in keys])
+    return all(k in json_object for k in keys)
 
 
 def has_only_keys(json_object: dict, keys: list[str]):
     # TODO: Tests
-    return all([k in keys for k in json_object])
+    return all(k in keys for k in json_object)
 
 
 def has_keys(
-    json_object: dict, required: list[str], *, optional: list[str] | None = None
+    json_object: dict,
+    required: list[str],
+    *,
+    optional: list[str] | None = None,
 ):
     # TODO: Tests
     all = required
