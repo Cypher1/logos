@@ -31,14 +31,11 @@ def get_conditions(city: str) -> str:
 
 
 @dataclass
-class Memory:
+class ReadDir:
     dir: Path
 
-    def __post_init__(self):
-        self.dir.mkdir(parents=True)
-
-    def list_memories(self) -> str:
-        print(f"Listing memories {self.dir}...")
+    def list_files(self) -> str:
+        print(f"Listing files {self.dir}...")
         from os import walk
 
         f = []
@@ -47,30 +44,36 @@ class Memory:
             break
         return "\n".join(f)
 
-    def read_memory(self, name: str) -> str | None:
-        print(f"Reading memory {self.dir / name}...")
+    def read(self, name: str) -> str | None:
+        print(f"Reading {self.dir / name}...")
         try:
             with safe_open(self.dir / f"{name}", "r", self.dir) as f:
                 return f.read()
         except FileNotFoundError:
             return None
 
-    def write_memory(self, name: str, data: str) -> bool:
-        print(f"Saving {self.dir / name}...")
-        with safe_open(self.dir / f"{name}", "w", self.dir) as f:
-            f.write(data)
-        return True
-
-    def read_memory_bytes(self, name: str) -> bytes | None:
-        print(f"Reading binary memory {self.dir / name}...")
+    def read_bytes(self, name: str) -> bytes | None:
+        print(f"Reading binary {self.dir / name}...")
         try:
             with safe_open_binary(self.dir / f"{name}", "rb", self.dir) as f:
                 return f.read()
         except FileNotFoundError:
             return None
 
-    def write_memory_bytes(self, name: str, data: bytes) -> bool:
-        print(f"Saving {self.dir / name}...")
+
+@dataclass
+class ReadWriteDir(ReadDir):
+    def __post_init__(self):
+        self.dir.mkdir(parents=True)
+
+    def write(self, name: str, data: str) -> bool:
+        print(f"Writing {self.dir / name}...")
+        with safe_open(self.dir / f"{name}", "w", self.dir) as f:
+            f.write(data)
+        return True
+
+    def write_bytes(self, name: str, data: bytes) -> bool:
+        print(f"Writing bytes {self.dir / name}...")
         with safe_open_binary(self.dir / f"{name}", "wb", self.dir) as f:
             f.write(data)
         return True

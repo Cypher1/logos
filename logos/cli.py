@@ -25,20 +25,18 @@ def main():
 
     assistant = Bot(state_file=session_dir / "chat.jsonl")
 
-    _main = tools.Memory(session_dir / "memory")
-    assistant.add_tool(tools.Memory.read_memory, instance=_main, namespace="main")
-    assistant.add_tool(tools.Memory.write_memory, instance=_main, namespace="main")
-    assistant.add_tool(tools.Memory.list_memories, instance=_main, namespace="main")
+    _main = tools.ReadWriteDir(session_dir / "memory")
+    assistant.add_tool(tools.ReadWriteDir.read, instance=_main, namespace="main")
+    assistant.add_tool(tools.ReadWriteDir.write, instance=_main, namespace="main")
+    assistant.add_tool(tools.ReadWriteDir.list_files, instance=_main, namespace="main")
 
-    repo = tools.Memory(session_dir / "tako")
-    assistant.add_tool(tools.Memory.read_memory, instance=repo, namespace="repo")
-    assistant.add_tool(tools.Memory.write_memory, instance=repo, namespace="repo")
-    assistant.add_tool(tools.Memory.list_memories, instance=repo, namespace="repo")
+    repo = tools.ReadWriteDir(session_dir / "tako")
+    assistant.add_tool(tools.ReadDir.read, instance=repo, namespace="repo")
+    assistant.add_tool(tools.ReadDir.list_files, instance=repo, namespace="repo")
 
-    notes = tools.Memory(session_dir / "notes")
-    assistant.add_tool(tools.Memory.read_memory, instance=notes, namespace="notes")
-    assistant.add_tool(tools.Memory.write_memory, instance=notes, namespace="notes")
-    assistant.add_tool(tools.Memory.list_memories, instance=notes, namespace="notes")
+    notes = tools.ReadWriteDir(session_dir / "notes")
+    assistant.add_tool(tools.ReadDir.read, instance=notes, namespace="notes")
+    assistant.add_tool(tools.ReadDir.list_files, instance=notes, namespace="notes")
 
     assistant.add_tool(tools.get_temperature)
     assistant.add_tool(tools.get_conditions)
