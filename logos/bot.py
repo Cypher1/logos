@@ -1,17 +1,18 @@
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Awaitable, Literal
 
-from ollama import ChatResponse, Message, chat
+from ollama import AsyncClient, ChatResponse, Message
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, RenderResult
 from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
 
-from logos import tools
 from logos.serializers import from_json, to_json
+from logos.tools import Sender
 
 DEFAULT_MODEL = "gemma4:latest"
 DEFAULT_WINDOW_SIZE = 5
@@ -43,6 +44,10 @@ def render_function(function: Message.ToolCall.Function) -> str:
 @dataclass
 class Bot:
     state_file: Path
+    sender: Sender
+    # TODO: Use the client to pull models as needed.
+    client: AsyncClient
+
     model: str = field(default=DEFAULT_MODEL)
     window_size: int = field(default=DEFAULT_WINDOW_SIZE)
     think: bool | Literal["low", "medium", "high"] = True
@@ -50,10 +55,11 @@ class Bot:
 
     tool_set: dict[str, Callable] = field(default_factory=dict)
     messages: list[Message] = field(default_factory=list)
+    user_interrupt: bool = True
 
     @classmethod
     def skip_fields(cls) -> set[str]:
-        return {"tool_set", "messages"}
+        return {"sender", "client", "tool_set", "messages"}
 
     def set(self, key, value: str):
         if key in Bot.skip_fields():
@@ -119,13 +125,13 @@ class Bot:
             f.close()
         print("Done")
 
-    def add_message(self, message: Message) -> None:
+    async def add_message(self, message: Message) -> None:
         if message.role == "assistant" and message.content:
             # Set up 'direct' chat
-            tools.send_nfty_message(message)
+            await self.sender.send_nfty_message(message)
 
         # Also report the debug log as we go.
-        tools.send_nfty_thinking(message)
+        await self.sender.send_nfty_thinking(message)
         self.messages.append(message)
         try:
             data = to_json(message)
@@ -136,38 +142,47 @@ class Bot:
         except FileNotFoundError:
             print(f"State file missing {self.state_file}")
 
-    def get_response(self) -> ChatResponse:
+    async def get_response(self) -> ChatResponse:
         # The python client automatically parses functions as a tool schema so we can pass them directly
         # Schemas can be passed directly in the tools list as well
-        response = chat(
+        # TODO: Streaming
+        response = await self.client.chat(
             model=self.model,
             messages=self.messages,
             tools=list(self.tool_set.values()) if self.tools else None,
             think=self.think,
         )
-        self.add_message(response.message)
-        if self.tools:
-            self.process_tool_calls(response.message)
+        await self.add_message(response.message)
+        await self.process_tool_calls(response.message)
         return response
 
-    def process_tool_calls(self, message: Message) -> None:
+    async def process_tool_call(self, call: Message.ToolCall) -> None:
+        if not self.tools:
+            return
+
+        # execute the appropriate tool
+        tool = self.tool_set.get(call.function.name)
+        maybe_result = tool(**call.function.arguments) if tool else "Unknown tool"
+        if isinstance(maybe_result, Awaitable):
+            result = await maybe_result
+        else:
+            result = maybe_result
+        # add the tool result to the messages
+        func = render_function(call.function)
+        result = f"{func} = {result!r}"
+        await self.add_message(
+            Message(role="tool", content=result, tool_name=call.function.name),
+        )
+
+    async def process_tool_calls(self, message: Message) -> None:
         if not self.tools:
             return
 
         if not message.tool_calls:
             return
 
-        for call in message.tool_calls:
-            # execute the appropriate tool
-            # TODO: Async
-            tool = self.tool_set.get(call.function.name)
-            result = tool(**call.function.arguments) if tool else "Unknown tool"
-            # add the tool result to the messages
-            func = render_function(call.function)
-            result = f"{func} = {result!r}"
-            self.add_message(
-                Message(role="tool", content=result, tool_name=call.function.name),
-            )
+        calls = {self.process_tool_call(call) for call in message.tool_calls}
+        await asyncio.gather(*calls)
 
     def render_message(self, console: Console, message: Message):
         out: ConsoleRenderable | str

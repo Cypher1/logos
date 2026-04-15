@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+import aiohttp
 from ollama import Message
-import requests
 
 from logos.safety_checks import safe_open, safe_open_binary
 
@@ -33,31 +33,35 @@ def get_conditions(city: str) -> str:
     return conditions.get(city, "Unknown")
 
 
-def send_nfty_notification(data: str, title: str, priority: str, tags: str) -> None:
-    # TODO: Async
-    requests.post(
-        "https://ntfy.sh/ellie_logos",
-        data=f"assistant: {data}",  # Prefix identifies sender
-        headers={"Title": f"assistant: {title}", "Priority": priority, "Tags": tags},
-    )
+@dataclass
+class Sender:
+    session: aiohttp.ClientSession
 
+    async def send_nfty_notification(self, data: str, title: str, priority: str, tags: str) -> None:
+        async with self.session.post(
+            "https://ntfy.sh/ellie_logos",
+            data=f"assistant: {data}",  # Prefix identifies sender
+            headers={"Title": f"assistant: {title}", "Priority": priority, "Tags": tags},
+        ) as response:
+            data = await response.text()
+            print(data)
 
-def send_nfty_message(message: Message) -> None:
-    # TODO: Async
-    requests.post(
-        "https://ntfy.sh/ellie_logos",
-        data=f"{message.role}: {message.content}",  # Prefix identifies sender
-        headers={ "Markdown": "yes" },
-    )
+    async def send_nfty_message(self, message: Message) -> None:
+        async with self.session.post(
+            "https://ntfy.sh/ellie_logos",
+            data=f"{message.role}: {message.content}",  # Prefix identifies sender
+            headers={"Markdown": "yes"},
+        ) as response:
+            data = await response.text()
+            print(data)
 
-
-def send_nfty_thinking(message: Message) -> None:
-    # TODO: Async
-    requests.post(
-        "https://ntfy.sh/ellie_logos_thinking",
-        data=message.model_dump_json(),
-        headers={ "Markdown": "yes" },
-    )
+    async def send_nfty_thinking(self, message: Message) -> None:
+        async with self.session.post(
+            "https://ntfy.sh/ellie_logos_thinking",
+            data=message.model_dump_json(),
+        ) as response:
+            data = await response.text()
+            print(data)
 
 
 @dataclass
