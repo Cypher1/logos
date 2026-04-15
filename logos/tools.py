@@ -30,6 +30,7 @@ def get_conditions(city: str) -> str:
     conditions = {"New York": "Partly cloudy", "London": "Rainy", "Tokyo": "Sunny"}
     return conditions.get(city, "Unknown")
 
+
 @dataclass
 class Memory:
     dir: Path
@@ -42,7 +43,7 @@ class Memory:
         from os import walk
 
         f = []
-        for (_dirpath, _dirnames, filenames) in walk(self.dir):
+        for _dirpath, _dirnames, filenames in walk(self.dir):
             f.extend(filenames)
             break
         return "\n".join(f)

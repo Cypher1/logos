@@ -15,7 +15,9 @@ def has_only_keys(json_object: dict, keys: list[str]):
     return all([k in keys for k in json_object])
 
 
-def has_keys(json_object: dict, required: list[str], *, optional: list[str] | None = None):
+def has_keys(
+    json_object: dict, required: list[str], *, optional: list[str] | None = None
+):
     # TODO: Tests
     all = required
     if optional is not None:
@@ -23,17 +25,26 @@ def has_keys(json_object: dict, required: list[str], *, optional: list[str] | No
     return has_all_keys(json_object, required) and has_only_keys(json_object, all)
 
 
-def object_hook(json_object: Any) -> Message | Message.ToolCall | Message.ToolCall.Function | dict:
+def object_hook(
+    json_object: Any,
+) -> Message | Message.ToolCall | Message.ToolCall.Function | dict:
     # TODO: Tests
     if has_keys(json_object, ["arguments", "name"]):
         return Message.ToolCall.Function.model_validate(json_object)
     if has_keys(json_object, ["function"]):
         return Message.ToolCall.model_validate(json_object)
-    if has_keys(json_object, ["role"], optional=["tool_calls", "tool_name", "content", "thinking", "images"]):
+    if has_keys(
+        json_object,
+        ["role"],
+        optional=["tool_calls", "tool_name", "content", "thinking", "images"],
+    ):
         return Message.model_validate(json_object)
     return json_object
 
-def from_json(json_object: str) -> Message | Message.ToolCall | Message.ToolCall.Function | dict:
+
+def from_json(
+    json_object: str,
+) -> Message | Message.ToolCall | Message.ToolCall.Function | dict:
     try:
         return loads(json_object, object_hook=object_hook)
     except ValidationError as e:
@@ -41,6 +52,7 @@ def from_json(json_object: str) -> Message | Message.ToolCall | Message.ToolCall
         for err in e.errors():
             print(err)
         raise e
+
 
 def pre_process(value) -> dict:
     if isinstance(value, Message):
@@ -50,6 +62,7 @@ def pre_process(value) -> dict:
     if isinstance(value, Message.ToolCall.Function):
         return value.model_dump(mode="json")
     raise TypeError(f"Value {value!r} not serializable")
+
 
 def to_json(value):
     return dumps(value, default=pre_process)

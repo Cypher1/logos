@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Any, Literal, Set
 
 from ollama import ChatResponse, Message, chat
-from rich.console import (Console, ConsoleOptions, ConsoleRenderable,
-                          RenderResult)
+from rich.console import Console, ConsoleOptions, ConsoleRenderable, RenderResult
 from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
@@ -15,6 +14,7 @@ from logos.serializers import from_json, to_json
 
 DEFAULT_MODEL = "gemma4:latest"
 DEFAULT_WINDOW_SIZE = 5
+
 
 @dataclass
 class IndentedRenderable:
@@ -40,7 +40,7 @@ def render_function(function: Message.ToolCall.Function) -> str:
 @dataclass
 class Bot:
     state_file: Path
-    model: str = field(default = DEFAULT_MODEL)
+    model: str = field(default=DEFAULT_MODEL)
     window_size: int = field(default=DEFAULT_WINDOW_SIZE)
     think: bool | Literal["low", "medium", "high"] = True
     tools: bool = True
@@ -50,7 +50,7 @@ class Bot:
 
     @classmethod
     def skip_fields(cls) -> Set[str]:
-        return { "tool_set", "messages" }
+        return {"tool_set", "messages"}
 
     def set(self, key, value: str):
         if key in Bot.skip_fields():
@@ -83,10 +83,10 @@ class Bot:
             if namespace:
                 name = f"{namespace}_{name}"
             # For some reason 'wraps' doesn't do this.
-            #from functools import WRAPPER_ASSIGNMENTS
+            # from functools import WRAPPER_ASSIGNMENTS
             impl.__annotations__ = func.__annotations__
             impl.__doc__ = func.__doc__
-            impl.__dict__['__name__'] = name
+            impl.__dict__["__name__"] = name
             func = impl
         if name in self.tool_set:
             # TODO: Handle this?
@@ -122,7 +122,7 @@ class Bot:
         try:
             data = to_json(message)
             with open(self.state_file, "a") as f:
-                f.write(data+"\n")
+                f.write(data + "\n")
                 f.flush()
                 f.close()
         except FileNotFoundError:
@@ -160,7 +160,9 @@ class Bot:
             # add the tool result to the messages
             func = render_function(call.function)
             result = f"{func} = {result!r}"
-            self.add_message(Message(role="tool", content=result, tool_name=call.function.name))
+            self.add_message(
+                Message(role="tool", content=result, tool_name=call.function.name)
+            )
 
     def render_message(self, console: Console, message: Message):
         out: ConsoleRenderable | str
@@ -182,7 +184,9 @@ class Bot:
             if message.tool_calls:
                 out = "tool_calls"
                 console.print(out, style="red")
-                out = "\n".join("\t"+render_function(call.function) for call in message.tool_calls)
+                out = "\n".join(
+                    "\t" + render_function(call.function) for call in message.tool_calls
+                )
                 out = IndentedRenderable(out, 1)
                 console.print(out, style="yellow")
         if message.images:

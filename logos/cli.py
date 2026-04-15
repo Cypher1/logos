@@ -24,7 +24,7 @@ def main():
 
     session_dir = logos_dir / "latest"
 
-    assistant = Bot(state_file = session_dir / "chat.jsonl")
+    assistant = Bot(state_file=session_dir / "chat.jsonl")
 
     _main = tools.Memory(session_dir / "memory")
     assistant.add_tool(tools.Memory.read_memory, instance=_main, namespace="main")
@@ -51,7 +51,7 @@ def main():
     while True:
         try:
             console.clear()
-            for message in assistant.messages[-assistant.window_size:]:
+            for message in assistant.messages[-assistant.window_size :]:
                 assistant.render_message(console, message)
 
             last = assistant.messages[-1] if assistant.messages else None
@@ -67,7 +67,7 @@ def main():
                 # TODO: Consider using a proper arg parser for this, allowing different data types etc.
                 while response.startswith(COMMAND_LEADER):
                     # Currently only supports keys that do not include spaces and integer setting values.
-                    args = response[len(COMMAND_LEADER):].split(" ")
+                    args = response[len(COMMAND_LEADER) :].split(" ")
                     command = args.pop(0)
                     if command == "quit":
                         break
@@ -76,7 +76,9 @@ def main():
                     elif command == "tools":
                         for k, v in assistant.tools.items():
                             console.print(k, style="red", end="")
-                            console.print(f"{inspect.signature(v)}", style="yellow", end="")
+                            console.print(
+                                f"{inspect.signature(v)}", style="yellow", end=""
+                            )
                             doc = f"  # {v.__doc__}" if v.__doc__ is not None else ""
                             console.print(doc, style="green")
                     elif command == "save":
