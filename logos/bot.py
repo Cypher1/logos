@@ -81,7 +81,7 @@ class Bot:
             impl = partial(func, instance)
             if namespace:
                 name = f"{namespace}_{name}"
-            # For some reason 'wraps' doesn't do this.
+            # For some reason 'wraps' and 'partial' don't handle this properly.
             # from functools import WRAPPER_ASSIGNMENTS
             impl.__annotations__ = func.__annotations__
             impl.__doc__ = func.__doc__
