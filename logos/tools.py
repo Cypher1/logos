@@ -1,8 +1,9 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
-import os
 
 from logos.safety_checks import safe_open, safe_open_binary
+
 
 def get_temperature(city: str) -> str:
     """Get the current temperature for a city

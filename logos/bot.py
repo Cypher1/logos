@@ -1,7 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from functools import partial, wraps
-import inspect
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, Set
 
@@ -12,8 +11,7 @@ from rich.markdown import Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
 
-from logos.serializers import to_json, from_json
-
+from logos.serializers import from_json, to_json
 
 DEFAULT_MODEL = "gemma4:latest"
 DEFAULT_WINDOW_SIZE = 5
@@ -165,6 +163,7 @@ class Bot:
             self.add_message(Message(role="tool", content=result, tool_name=call.function.name))
 
     def render_message(self, console: Console, message: Message):
+        out: ConsoleRenderable | str
         if message.tool_name and message.content:
             out = Syntax(message.content, "python", theme="monokai")
             out = IndentedRenderable(out, 1)

@@ -1,8 +1,8 @@
-from dataclasses import asdict
 import inspect
-import sys
-from pathlib import Path
 import os
+import sys
+from dataclasses import asdict
+from pathlib import Path
 
 from ollama import Message
 from prompt_toolkit import PromptSession
@@ -10,7 +10,6 @@ from rich.console import Console
 
 import logos.tools as tools
 from logos.bot import Bot
-
 
 COMMAND_LEADER = "/"
 

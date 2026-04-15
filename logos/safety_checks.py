@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING, BinaryIO
 from io import TextIOWrapper
-from pathlib import Path
 from os.path import abspath
+from pathlib import Path
+from typing import TYPE_CHECKING, BinaryIO
 
 if TYPE_CHECKING:
-    from _typeshed import OpenTextMode, OpenBinaryMode
+    from _typeshed import OpenBinaryMode, OpenTextMode
 
 
 class ForbiddenPathError(Exception):

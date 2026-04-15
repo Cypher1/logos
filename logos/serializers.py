@@ -1,6 +1,5 @@
-from dataclasses import asdict
+from json import dumps, loads
 from typing import Any
-from json import decoder, dumps, loads
 
 from ollama import Message
 from pydantic import ValidationError
@@ -35,15 +34,13 @@ def object_hook(json_object: Any) -> Message | Message.ToolCall | Message.ToolCa
     return json_object
 
 def from_json(json_object: str) -> Message | Message.ToolCall | Message.ToolCall.Function | dict:
-    #try:
-    return loads(json_object, object_hook=object_hook)
-    #except ValidationError as e:
-        #print(json_object)
-        #for err in e.errors():
-        #    print(err)
-        #raise e
-    #except Exception as e:
-        #raise e
+    try:
+        return loads(json_object, object_hook=object_hook)
+    except ValidationError as e:
+        print(json_object)
+        for err in e.errors():
+            print(err)
+        raise e
 
 def pre_process(value) -> dict:
     if isinstance(value, Message):
