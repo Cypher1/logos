@@ -78,7 +78,6 @@ class Bot:
     def add_tool(self, func, instance=None, namespace=None) -> "Bot":
         name = f"{func.__name__}"
         if instance:
-            # impl.__dict__['__signature__'] = inspect.signature(func)
             impl = partial(func, instance)
             if namespace:
                 name = f"{namespace}_{name}"
