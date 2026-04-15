@@ -1,11 +1,12 @@
+import ast
 import asyncio
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
-from typing import Any, Awaitable, Literal
+from typing import Any, Literal
 
-from ollama import AsyncClient, ChatResponse, Message
+from ollama import AsyncClient, Image, Message
 from rich.console import Console, ConsoleOptions, ConsoleRenderable, RenderResult
 from rich.markdown import Markdown
 from rich.segment import Segment
@@ -15,7 +16,10 @@ from logos.serializers import from_json, to_json
 from logos.tools import Sender
 
 DEFAULT_MODEL = "gemma4:latest"
-DEFAULT_WINDOW_SIZE = 5
+DEFAULT_WINDOW_SIZE = 3
+
+TOOL_CALL = "<execute_tool>"
+TOOL_CALL_END = "</execute_tool>"
 
 
 @dataclass
@@ -142,19 +146,73 @@ class Bot:
         except FileNotFoundError:
             print(f"State file missing {self.state_file}")
 
-    async def get_response(self) -> ChatResponse:
+    async def get_response(self, console: Console):
         # The python client automatically parses functions as a tool schema so we can pass them directly
         # Schemas can be passed directly in the tools list as well
-        # TODO: Streaming
-        response = await self.client.chat(
+        stream = await self.client.chat(
             model=self.model,
             messages=self.messages,
             tools=list(self.tool_set.values()) if self.tools else None,
             think=self.think,
+            stream=True,
         )
-        await self.add_message(response.message)
-        await self.process_tool_calls(response.message)
-        return response
+
+        thinking: str = ""
+        content: str = ""
+        tool_calls: list[Message.ToolCall] = []
+        extra_tool_calls: list[Message.ToolCall] = []
+        images: list[Image] = []
+
+        # accumulate the partial fields
+        message: Message | None = None
+        async for chunk in stream:
+            if chunk.message.thinking:
+                thinking += chunk.message.thinking
+            if chunk.message.content:
+                content += chunk.message.content
+            if chunk.message.tool_calls:
+                tool_calls.extend(chunk.message.tool_calls)
+            if chunk.message.images:
+                images.extend(chunk.message.images)
+
+            # TODO: Remove this work around.
+            # This is a work around for errors in the ollama
+            # Streaming API for tool calling.
+            # See: https://github.com/ollama/ollama/pull/9973/changes
+            if TOOL_CALL in content:
+                parts = content.split(TOOL_CALL)
+                # content = parts.pop(0)
+                extra_tool_calls = []
+                for part in parts:
+                    calls, end = part.split(TOOL_CALL_END, 1)
+                    # content += end
+                    calls_ast = ast.parse(calls).body
+                    for call_ast in calls_ast:
+                        if not isinstance(call_ast, ast.Call):
+                            raise ValueError(calls)
+                        name = ast.unparse(call_ast.func)
+                        args = {str(i): ast.unparse(x) for i, x in enumerate(call_ast.args)}
+                        # TODO: Handle x.arg == None
+                        arguments = {str(x.arg): ast.unparse(x.value) for x in call_ast.keywords}
+                        # TODO: Handle duplicate keys
+                        arguments.update(args)
+                        function = Message.ToolCall.Function(name=name, arguments=arguments)
+                        extra_tool_calls.append(Message.ToolCall(function=function))
+
+            message = Message(
+                role="assistant",
+                content=content,
+                thinking=thinking,
+                tool_calls=(tool_calls + extra_tool_calls) or None,
+                images=images or None,
+            )
+            self.render_messages(console, extra=message, finished=False)
+
+        if message is None:
+            raise ValueError("No chunks recieved")
+
+        await self.add_message(message)
+        await self.process_tool_calls(message)
 
     async def process_tool_call(self, call: Message.ToolCall) -> None:
         if not self.tools:
@@ -169,9 +227,8 @@ class Bot:
             result = maybe_result
         # add the tool result to the messages
         func = render_function(call.function)
-        result = f"{func} = {result!r}"
         await self.add_message(
-            Message(role="tool", content=result, tool_name=call.function.name),
+            Message(role="tool", content=result, tool_name=func),
         )
 
     async def process_tool_calls(self, message: Message) -> None:
@@ -184,28 +241,44 @@ class Bot:
         calls = {self.process_tool_call(call) for call in message.tool_calls}
         await asyncio.gather(*calls)
 
-    def render_message(self, console: Console, message: Message):
+    def render_message(self, console: Console, message: Message, *, finished: bool = True):
         out: ConsoleRenderable | str
         if message.tool_name and message.content:
-            out = Syntax(message.content, "python", theme="monokai")
-            out = IndentedRenderable(out, 1)
-            console.print(out, style="red")
+            console.print(message.tool_name, style="red")
+            out = Markdown(message.content)
+            out = IndentedRenderable(out, 4)
+            console.print(out, style="yellow")
         else:
             if message.thinking:
                 console.print(message.role, style="red")
                 out = message.thinking
-                out = IndentedRenderable(out, 1)
+                if not finished:
+                    out += "..."
+                out = Markdown(out)
+                out = IndentedRenderable(out, 4)
                 console.print(out, style="yellow")
             if message.content:
                 console.print(message.role, style="red")
-                out = Markdown(message.content)
-                out = IndentedRenderable(out, 1)
+                out = message.content
+                if not finished:
+                    out += "..."
+                out = Markdown(out)
+                out = IndentedRenderable(out, 4)
                 console.print(out, style="green")
             if message.tool_calls:
                 out = "tool_calls"
                 console.print(out, style="red")
-                out = "\n".join("\t" + render_function(call.function) for call in message.tool_calls)
-                out = IndentedRenderable(out, 1)
-                console.print(out, style="yellow")
+                for call in message.tool_calls:
+                    out = render_function(call.function)
+                    out = IndentedRenderable(out, 4)
+                    console.print(out, style="yellow")
         if message.images:
             console.print(message.images, style="red")
+
+    def render_messages(self, console: Console, *, extra: Message | None = None, finished: bool = True):
+        console.clear()
+        for message in self.messages[-self.window_size :]:
+            self.render_message(console, message)
+
+        if extra:
+            self.render_message(console, extra, finished=finished)

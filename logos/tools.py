@@ -43,8 +43,8 @@ class Sender:
             data=f"assistant: {data}",  # Prefix identifies sender
             headers={"Title": f"assistant: {title}", "Priority": priority, "Tags": tags},
         ) as response:
-            data = await response.text()
-            print(data)
+            _data = await response.text()
+            # print(data)
 
     async def send_nfty_message(self, message: Message) -> None:
         async with self.session.post(
@@ -52,31 +52,29 @@ class Sender:
             data=f"{message.role}: {message.content}",  # Prefix identifies sender
             headers={"Markdown": "yes"},
         ) as response:
-            data = await response.text()
-            print(data)
+            _data = await response.text()
+            # print(data)
 
     async def send_nfty_thinking(self, message: Message) -> None:
         async with self.session.post(
             "https://ntfy.sh/ellie_logos_thinking",
             data=message.model_dump_json(),
         ) as response:
-            data = await response.text()
-            print(data)
+            _data = await response.text()
+            # print(data)
 
 
 @dataclass
 class ReadDir:
     dir: Path
 
-    def list_files(self) -> str:
+    def list_files(self, name="") -> str:
         print(f"Listing files {self.dir}...")
-        from os import walk
-
-        f = []
-        for _dirpath, _dirnames, filenames in walk(self.dir):
-            f.extend(filenames)
-            break
-        return "\n".join(f)
+        subdir = self.dir
+        if name:
+            subdir = subdir / f"{name}"
+        files = [str(f.relative_to(subdir)) for f in subdir.iterdir()]
+        return "\n".join(files)
 
     def read(self, name: str) -> str | None:
         print(f"Reading {self.dir / name}...")

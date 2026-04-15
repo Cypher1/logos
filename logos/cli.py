@@ -27,14 +27,14 @@ class Cli:
         if command == "model":
             self.console.print(assistant.model, style="yellow")
         elif command == "tools":
-            for k, v in assistant.tool_set.items():
-                self.console.print(k, style="red", end="")
+            for tool, impl in assistant.tool_set.items():
+                self.console.print(tool, style="red", end="")
                 self.console.print(
-                    f"{inspect.signature(v)}",
+                    f"{inspect.signature(impl)}",
                     style="yellow",
                     end="",
                 )
-                doc = f"  # {v.__doc__}" if v.__doc__ is not None else ""
+                doc = f"  # {impl.__doc__}" if impl.__doc__ is not None else ""
                 self.console.print(doc, style="green")
         elif command == "save":
             assistant.save_state()
@@ -61,9 +61,7 @@ class Cli:
         return False
 
     async def run_step(self, assistant: Bot):
-        self.console.clear()
-        for message in assistant.messages[-assistant.window_size :]:
-            assistant.render_message(self.console, message)
+        assistant.render_messages(self.console)
 
         last = assistant.messages[-1] if assistant.messages else None
         if last is None or (last.role != "user" and last.role != "tool" and last.content):
@@ -85,7 +83,7 @@ class Cli:
             if response:
                 await assistant.add_message(Message(role="user", content=response))
         else:
-            await assistant.get_response()
+            await assistant.get_response(self.console)
 
     async def run(self):
         # Load in the previous session
@@ -137,7 +135,7 @@ class Cli:
 
 
 async def amain():
-    console = Console()
+    console = Console(soft_wrap=True, tab_size=4)
     prompt = PromptSession()
 
     async with aiohttp.ClientSession() as http_session:
