@@ -1,3 +1,4 @@
+from dataclasses import asdict
 import inspect
 import sys
 from pathlib import Path
@@ -10,7 +11,8 @@ from rich.console import Console
 import logos.tools as tools
 from logos.bot import Bot
 
-MODEL = "gemma4:latest"
+
+COMMAND_LEADER = "/"
 
 
 def main():
@@ -23,7 +25,7 @@ def main():
 
     session_dir = logos_dir / "latest"
 
-    assistant = Bot(MODEL, state_file = session_dir / "chat.jsonl")
+    assistant = Bot(state_file = session_dir / "chat.jsonl")
 
     _main = tools.Memory(session_dir / "memory")
     assistant.add_tool(tools.Memory.read_memory, instance=_main, namespace="main")
@@ -50,7 +52,7 @@ def main():
     while True:
         try:
             console.clear()
-            for message in assistant.messages:
+            for message in assistant.messages[-assistant.window_size:]:
                 assistant.render_message(console, message)
 
             last = assistant.messages[-1] if assistant.messages else None
@@ -62,23 +64,44 @@ def main():
             if user_interrupt:
                 user_interrupt = False
                 console.print("user", style="red")
-                response = "/"
-                while response.startswith("/"):
-                    if response == "/quit":
+                response = COMMAND_LEADER
+                # TODO: Consider using a proper arg parser for this, allowing different data types etc.
+                while response.startswith(COMMAND_LEADER):
+                    # Currently only supports keys that do not include spaces and integer setting values.
+                    args = response[len(COMMAND_LEADER):].split(" ")
+                    command = args.pop(0)
+                    if command == "quit":
                         break
-                    if response == "/model":
+                    elif command == "model":
                         console.print(assistant.model, style="yellow")
-                    if response == "/tools":
+                    elif command == "tools":
                         for k, v in assistant.tools.items():
                             console.print(k, style="red", end="")
                             console.print(f"{inspect.signature(v)}", style="yellow", end="")
                             doc = f"  # {v.__doc__}" if v.__doc__ is not None else ""
                             console.print(doc, style="green")
-                    elif response == "/save":
+                    elif command == "save":
                         assistant.save_state()
-                    elif response == "/load":
+                    elif command == "load":
                         assistant.load_state()
-
+                    elif command == "set":
+                        if args:
+                            key = args[0]
+                            if len(args) > 1:
+                                value = args[1]
+                                try:
+                                    assistant.set(key, value)
+                                except Exception as e:
+                                    console.print(e)
+                            else:
+                                value = assistant.get(key)
+                            console.print(f"{key} = {value}", style="yellow")
+                        else:
+                            for key, value in asdict(assistant).items():
+                                # Allow the assistant code to skip some keys that shouldn't be user settable
+                                if key in assistant.skip_fields():
+                                    continue
+                                console.print(f"{key} = {value}", style="yellow")
                     response = session.prompt("> ")
                 if response:
                     assistant.add_message(Message(role="user", content=response))
@@ -86,14 +109,12 @@ def main():
                 assistant.get_response()
         except KeyboardInterrupt:
             user_interrupt = True
+            # TODO: System messages through messages log without saving.
             print("Allowing interrupt (use Control-D for quit)")
         except EOFError:
             break
         except Exception as e:
+            # TODO: Make code modifiable and reloadable at runtime?
+            # TODO: System messages through messages log without saving.
             print(e, file=sys.stderr)
             raise e
-            # break
-            # Then quit
-
-    # No longer needed as messages are added one by one.
-    # assistant.save_state()

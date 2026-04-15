@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from functools import partial, wraps
 import inspect
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, Set
 
 from ollama import ChatResponse, Message, chat
 from rich.console import (Console, ConsoleOptions, ConsoleRenderable,
@@ -14,6 +14,9 @@ from rich.syntax import Syntax
 
 from logos.serializers import to_json, from_json
 
+
+DEFAULT_MODEL = "gemma4:latest"
+DEFAULT_WINDOW_SIZE = 5
 
 @dataclass
 class IndentedRenderable:
@@ -38,11 +41,41 @@ def render_function(function: Message.ToolCall.Function) -> str:
 
 @dataclass
 class Bot:
-    model: str
     state_file: Path
-    messages: list[Message] = field(default_factory=list)
-    tools: dict[str, Callable] = field(default_factory=dict)
+    model: str = field(default = DEFAULT_MODEL)
+    window_size: int = field(default=DEFAULT_WINDOW_SIZE)
     think: bool | Literal["low", "medium", "high"] = True
+    tools: bool = True
+
+    tool_set: dict[str, Callable] = field(default_factory=dict)
+    messages: list[Message] = field(default_factory=list)
+
+    @classmethod
+    def skip_fields(cls) -> Set[str]:
+        return { "tool_set", "messages" }
+
+    def set(self, key, value: str):
+        if key in Bot.skip_fields():
+            raise ValueError(key)
+        elif key == "think":
+            value = value.lower()
+            if value == "true":
+                setattr(self, key, True)
+            elif value == "false":
+                setattr(self, key, False)
+            else:
+                setattr(self, key, value)
+        elif type(self.get(key)) is int:
+            setattr(self, key, int(value))
+        elif type(self.get(key)) is Path:
+            setattr(self, key, Path(value))
+        else:
+            setattr(self, key, value)
+
+    def get(self, key) -> Any:
+        if key in Bot.skip_fields():
+            raise ValueError(key)
+        return getattr(self, key)
 
     def add_tool(self, func, instance=None, namespace=None) -> "Bot":
         name = f"{func.__name__}"
@@ -57,10 +90,10 @@ class Bot:
             impl.__doc__ = func.__doc__
             impl.__dict__['__name__'] = name
             func = impl
-        if name in self.tools:
+        if name in self.tool_set:
             # TODO: Handle this?
             raise Exception(f" Bot already has tool for name '{name}'")
-        self.tools[name] = func
+        self.tool_set[name] = func
         return self
 
     def load_state(self) -> None:
@@ -103,21 +136,25 @@ class Bot:
         response = chat(
             model=self.model,
             messages=self.messages,
-            tools=list(self.tools.values()),
+            tools=list(self.tool_set.values()) if self.tools else None,
             think=self.think,
         )
         self.add_message(response.message)
-        self.process_tool_calls(response.message)
+        if self.tools:
+            self.process_tool_calls(response.message)
         return response
 
     def process_tool_calls(self, message: Message) -> None:
+        if not self.tools:
+            return
+
         if not message.tool_calls:
             return
 
         for call in message.tool_calls:
             # execute the appropriate tool
             # TODO: Async
-            tool = self.tools.get(call.function.name)
+            tool = self.tool_set.get(call.function.name)
             if tool:
                 result = tool(**call.function.arguments)
             else:
