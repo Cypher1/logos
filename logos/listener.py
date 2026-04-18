@@ -24,24 +24,23 @@ class NtfyListener:
     topic: str
     open = False
     observers: list[Callable[[Message], None]] = field(default_factory=list)
-    process: Process | None = field(default=None)
     child_conn: PipeConnectionI[Message, None] | None = field(default=None)
+    process: Process | None = field(default=None, init=False)
 
     @property
     def json_url(self) -> str:
         return f"https://ntfy.sh/{self.topic}/json"
 
-    def run_as_process(self, child_conn: PipeConnectionI[Message, None]):
+    def run_as_process(self) -> "NtfyListener":
         def listen():
             assert self.child_conn is not None
             self.observers.append(self.child_conn.send)
             asyncio.run(self.start())
 
-        assert self.child_conn is None
-        self.child_conn = child_conn
         assert self.process is None
         self.process = Process(target=listen)
         self.process.start()
+        return self
 
     def join(self):
         if self.child_conn:

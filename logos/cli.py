@@ -132,14 +132,13 @@ class Cli:
         await self.run(assistant)
 
     async def run(self, assistant: Bot):
-        listener = NtfyListener("ellie_logos")
+        reciever_conn, listener_conn = Pipe()
 
-        parent_conn, child_conn = Pipe()
+        listener = NtfyListener("ellie_logos", child_conn=listener_conn).run_as_process()
 
-        listener.run_as_process(child_conn)
         while not assistant.shutdown:
-            if parent_conn.poll(0.1):
-                msg = parent_conn.recv()
+            if reciever_conn.poll(0.1):
+                msg = reciever_conn.recv()
                 await assistant.store_message(msg)
             try:
                 await self.run_step(assistant)
