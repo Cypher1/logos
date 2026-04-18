@@ -1,7 +1,6 @@
 import asyncio
 import inspect
 import signal
-import sys
 from dataclasses import dataclass
 from multiprocessing import Pipe
 from pathlib import Path
@@ -137,7 +136,7 @@ class Cli:
         listener = NtfyListener("ellie_logos", child_conn=listener_conn).run_as_process()
 
         while not assistant.shutdown:
-            if reciever_conn.poll(0.1):
+            if reciever_conn.poll():
                 msg = reciever_conn.recv()
                 await assistant.store_message(msg)
             try:
@@ -153,11 +152,6 @@ class Cli:
                 assistant.user_interrupt = True
                 # TODO: System messages through messages log without saving.
                 self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
-            except Exception as e:
-                # TODO: Make code modifiable and reloadable at runtime?
-                # TODO: System messages through messages log without saving.
-                print(e, file=sys.stderr)
-                raise e
         listener.join()
 
 

@@ -3,20 +3,11 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from multiprocessing import Process
-from typing import Protocol, TypeVar
 
 import aiohttp
 from ollama import Message
 
-T = TypeVar("T")
-U = TypeVar("U")
-
-
-class PipeConnectionI[T, U](Protocol):
-    def send(self, obj: T): ...
-    def recv(self) -> U: ...
-    def poll(self, timeout: float | None = 0) -> bool: ...
-    def close(self): ...
+from logos.stubs import PipeConnectionI
 
 
 @dataclass
