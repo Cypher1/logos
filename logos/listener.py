@@ -22,6 +22,13 @@ class NtfyListener:
     def json_url(self) -> str:
         return f"https://ntfy.sh/{self.topic}/json"
 
+    def __enter__(self):
+        self.run_as_process()
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        self.join()
+        raise exc_value
+
     def run_as_process(self) -> "NtfyListener":
         def listen():
             assert self.child_conn is not None

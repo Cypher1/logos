@@ -133,26 +133,24 @@ class Cli:
     async def run(self, assistant: Bot):
         reciever_conn, listener_conn = Pipe()
 
-        listener = NtfyListener("ellie_logos", child_conn=listener_conn).run_as_process()
-
-        while not assistant.shutdown:
-            if reciever_conn.poll():
-                msg = reciever_conn.recv()
-                await assistant.store_message(msg)
-            try:
-                await self.run_step(assistant)
-            except KeyboardInterrupt:
-                if assistant.user_interrupt:
-                    assistant.shutdown = True
-                else:
+        with NtfyListener("ellie_logos", child_conn=listener_conn):
+            while not assistant.shutdown:
+                if reciever_conn.poll():
+                    msg = reciever_conn.recv()
+                    await assistant.store_message(msg)
+                try:
+                    await self.run_step(assistant)
+                except KeyboardInterrupt:
+                    if assistant.user_interrupt:
+                        assistant.shutdown = True
+                    else:
+                        assistant.user_interrupt = True
+                        # TODO: System messages through messages log without saving.
+                        self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
+                except EOFError:
                     assistant.user_interrupt = True
                     # TODO: System messages through messages log without saving.
                     self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
-            except EOFError:
-                assistant.user_interrupt = True
-                # TODO: System messages through messages log without saving.
-                self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
-        listener.join()
 
 
 async def amain():
