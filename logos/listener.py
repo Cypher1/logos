@@ -1,21 +1,57 @@
 import asyncio
 import json
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from multiprocessing import Process
+from typing import Protocol, TypeVar
 
 import aiohttp
 from ollama import Message
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+
+class PipeConnectionI[T, U](Protocol):
+    def send(self, obj: T): ...
+    def recv(self) -> U: ...
+    def poll(self, timeout: float | None = 0) -> bool: ...
+    def close(self): ...
 
 
 @dataclass
 class NtfyListener:
     topic: str
     open = False
-    observers: list[Callable[[Message], Awaitable[None]]] = field(default_factory=list)
+    observers: list[Callable[[Message], None]] = field(default_factory=list)
+    process: Process | None = field(default=None)
+    child_conn: PipeConnectionI[Message, None] | None = field(default=None)
 
     @property
     def json_url(self) -> str:
         return f"https://ntfy.sh/{self.topic}/json"
+
+    def run_as_process(self, child_conn: PipeConnectionI[Message, None]):
+        def listen():
+            assert self.child_conn is not None
+            self.observers.append(self.child_conn.send)
+            asyncio.run(self.start())
+
+        assert self.child_conn is None
+        self.child_conn = child_conn
+        assert self.process is None
+        self.process = Process(target=listen)
+        self.process.start()
+
+    def join(self):
+        if self.child_conn:
+            self.child_conn.close()
+        if self.process:
+            self.process.join()
+
+    async def start(self):
+        async with aiohttp.ClientSession() as http_session:
+            await self.listen(http_session)
 
     async def listen(self, client: aiohttp.ClientSession):
         async with client.get(self.json_url, timeout=None) as resp:
@@ -38,7 +74,8 @@ class NtfyListener:
                         role=role,
                         content=content,
                     )
-                    await asyncio.gather(*(obs(message) for obs in self.observers))
+                    for obs in self.observers:
+                        obs(message)
 
                 # Raw message
                 # print(f"Unknown message (open = {self.open})", obj)
@@ -47,7 +84,7 @@ class NtfyListener:
 async def amain():
     listener = NtfyListener("ellie_logos")
 
-    async def printer(message: Message):
+    def printer(message: Message):
         print(message.role)
         print(message.content)
 

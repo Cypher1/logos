@@ -3,7 +3,7 @@ import inspect
 import signal
 import sys
 from dataclasses import dataclass
-from multiprocessing import Pipe, Process
+from multiprocessing import Pipe
 from pathlib import Path
 
 import aiohttp
@@ -132,25 +132,11 @@ class Cli:
         await self.run(assistant)
 
     async def run(self, assistant: Bot):
-        def listen(child_conn):
-            listener = NtfyListener("ellie_logos")
-
-            async def send(message: Message):
-                child_conn.send(msg)
-
-            listener.observers.append(send)
-
-            async def inner():
-                async with aiohttp.ClientSession() as http_session:
-                    await listener.listen(http_session)
-                child_conn.close()
-
-            asyncio.run(inner())
+        listener = NtfyListener("ellie_logos")
 
         parent_conn, child_conn = Pipe()
-        p = Process(target=listen, args=(child_conn,))
-        p.start()
 
+        listener.run_as_process(child_conn)
         while not assistant.shutdown:
             if parent_conn.poll(0.1):
                 msg = parent_conn.recv()
@@ -173,10 +159,12 @@ class Cli:
                 # TODO: System messages through messages log without saving.
                 print(e, file=sys.stderr)
                 raise e
-        p.join()
+        listener.join()
 
 
 async def amain():
+    # TODO: Switch to Textual
+    # https://realpython.com/python-textual/#creating-your-first-textual-app
     console = Console(soft_wrap=True, tab_size=4)
     prompt = PromptSession()
 
