@@ -44,6 +44,7 @@ def safe_open(
         requested_path=path,
         contained_directory=contained_directory,
     )
+    path.parent.mkdir(parents=True, exist_ok=True)
     return path.open(mode)
 
 
@@ -57,4 +58,5 @@ def safe_open_binary(
         requested_path=path,
         contained_directory=contained_directory,
     )
+    path.parent.mkdir(parents=True, exist_ok=True)
     return path.open(mode)

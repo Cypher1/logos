@@ -1,7 +1,9 @@
 import asyncio
 import inspect
+import signal
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
+from multiprocessing import Pipe, Process
 from pathlib import Path
 
 import aiohttp
@@ -11,6 +13,7 @@ from rich.console import Console
 
 import logos.tools as tools
 from logos.bot import Bot
+from logos.listener import NtfyListener
 
 COMMAND_LEADER = "/"
 
@@ -20,11 +23,12 @@ class Cli:
     console: Console
     prompt: PromptSession[str]
     sender: tools.Sender
+    http_session: aiohttp.ClientSession
 
-    async def handle_command(self, assistant: Bot, command: str, args: list[str]) -> bool:
+    async def handle_command(self, assistant: Bot, command: str, args: list[str]):
         if command == "quit":
-            return True
-        if command == "model":
+            assistant.shutdown = True
+        elif command == "model":
             self.console.print(assistant.model, style="yellow")
         elif command == "tools":
             for tool, impl in assistant.tool_set.items():
@@ -53,39 +57,38 @@ class Cli:
                     value = assistant.get(key)
                 self.console.print(f"{key} = {value}", style="yellow")
             else:
-                for key, value in asdict(assistant).items():
+                for key, value in assistant.__dict__.items():  # TODO: Cleanup
                     # Allow the assistant code to skip some keys that shouldn't be user settable
                     if key in assistant.skip_fields():
                         continue
                     self.console.print(f"{key} = {value}", style="yellow")
-        return False
 
     async def run_step(self, assistant: Bot):
         assistant.render_messages(self.console)
 
-        last = assistant.messages[-1] if assistant.messages else None
-        if last is None or (last.role != "user" and last.role != "tool" and last.content):
-            assistant.user_interrupt = True
-
-        if assistant.user_interrupt:
-            assistant.user_interrupt = False
-            self.console.print("user", style="red")
-            response = COMMAND_LEADER
-            # TODO: Consider using a proper arg parser for this, allowing different data types etc.
-            while response.startswith(COMMAND_LEADER):
-                # Currently only supports keys that do not include spaces and integer setting values.
-                args = response[len(COMMAND_LEADER) :].split(" ")
-                command = args.pop(0)
-                quit = await self.handle_command(assistant, command, args)
-                if quit:
-                    break
-                response = await self.prompt.prompt_async("> ")
-            if response:
-                await assistant.add_message(Message(role="user", content=response))
-        else:
+        if not assistant.user_interrupt:
             await assistant.get_response(self.console)
+            return
 
-    async def run(self):
+        self.console.print("user", style="red")
+        # TODO: Put this in a task that yeilds / stops when `user_interrupt = False`
+        # TODO: Consider using a proper arg parser for this, allowing different data types etc.
+
+        response: str = "/"
+        while response.startswith(COMMAND_LEADER):
+            response = await self.prompt.prompt_async("> ")
+            # Currently only supports keys that do not include spaces and integer setting values.
+            args = response[len(COMMAND_LEADER) :].split(" ")
+            command = args.pop(0)
+            await self.handle_command(assistant, command, args)
+
+        if not response:
+            assistant.user_interrupt = False
+            return
+
+        await assistant.add_message(Message(role="user", content=response))
+
+    async def start(self):
         # Load in the previous session
         logos_dir = Path.home() / ".logos"
         logos_dir.mkdir(parents=True, exist_ok=True)
@@ -97,18 +100,18 @@ class Cli:
 
         assistant = Bot(state_file=session_dir / "chat.jsonl", sender=self.sender, client=client)
 
-        _main = tools.ReadWriteDir(session_dir / "memory")
-        assistant.add_tool(tools.ReadWriteDir.read, instance=_main, namespace="main")
-        assistant.add_tool(tools.ReadWriteDir.write, instance=_main, namespace="main")
-        assistant.add_tool(tools.ReadWriteDir.list_files, instance=_main, namespace="main")
+        memory = tools.ReadWriteDir(session_dir / "memory")
+        assistant.add_tool(tools.ReadWriteDir.read, instance=memory, namespace="memory")
+        assistant.add_tool(tools.ReadWriteDir.write, instance=memory, namespace="memory")
+        assistant.add_tool(tools.ReadWriteDir.ls, instance=memory, namespace="memory")
 
-        repo = tools.ReadWriteDir(session_dir / "tako")
-        assistant.add_tool(tools.ReadDir.read, instance=repo, namespace="repo")
-        assistant.add_tool(tools.ReadDir.list_files, instance=repo, namespace="repo")
+        tako = tools.ReadWriteDir(session_dir / "tako")
+        assistant.add_tool(tools.ReadWriteDir.read, instance=tako, namespace="tako")
+        assistant.add_tool(tools.ReadWriteDir.ls, instance=tako, namespace="tako")
 
         notes = tools.ReadWriteDir(session_dir / "notes")
-        assistant.add_tool(tools.ReadDir.read, instance=notes, namespace="notes")
-        assistant.add_tool(tools.ReadDir.list_files, instance=notes, namespace="notes")
+        assistant.add_tool(tools.ReadWriteDir.read, instance=notes, namespace="notes")
+        assistant.add_tool(tools.ReadWriteDir.ls, instance=notes, namespace="notes")
 
         assistant.add_tool(tools.get_temperature)
         assistant.add_tool(tools.get_conditions)
@@ -118,20 +121,59 @@ class Cli:
 
         assistant.load_state()
 
-        while True:
+        loop = asyncio.get_event_loop()
+
+        def set_interrupt():
+            assistant.user_interrupt = True
+            self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
+
+        loop.add_signal_handler(signal.SIGINT, set_interrupt)
+        loop.add_signal_handler(signal.SIGTERM, set_interrupt)
+        await self.run(assistant)
+
+    async def run(self, assistant: Bot):
+        def listen(child_conn):
+            listener = NtfyListener("ellie_logos")
+
+            async def send(message: Message):
+                child_conn.send(msg)
+
+            listener.observers.append(send)
+
+            async def inner():
+                async with aiohttp.ClientSession() as http_session:
+                    await listener.listen(http_session)
+                child_conn.close()
+
+            asyncio.run(inner())
+
+        parent_conn, child_conn = Pipe()
+        p = Process(target=listen, args=(child_conn,))
+        p.start()
+
+        while not assistant.shutdown:
+            if parent_conn.poll(0.1):
+                msg = parent_conn.recv()
+                await assistant.store_message(msg)
             try:
                 await self.run_step(assistant)
             except KeyboardInterrupt:
+                if assistant.user_interrupt:
+                    assistant.shutdown = True
+                else:
+                    assistant.user_interrupt = True
+                    # TODO: System messages through messages log without saving.
+                    self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
+            except EOFError:
                 assistant.user_interrupt = True
                 # TODO: System messages through messages log without saving.
-                self.console.print("Allowing interrupt (use Control-D for quit)", style="yellow")
-            except EOFError:
-                break
+                self.console.print("Allowing interrupt (use /quit for quit)", style="yellow")
             except Exception as e:
                 # TODO: Make code modifiable and reloadable at runtime?
                 # TODO: System messages through messages log without saving.
                 print(e, file=sys.stderr)
                 raise e
+        p.join()
 
 
 async def amain():
@@ -145,9 +187,10 @@ async def amain():
             console,
             prompt,
             sender,
+            http_session,
         )
 
-        await cli.run()
+        await cli.start()
 
 
 def main():

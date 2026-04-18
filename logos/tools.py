@@ -68,26 +68,23 @@ class Sender:
 class ReadDir:
     dir: Path
 
-    def list_files(self, name="") -> str:
-        print(f"Listing files {self.dir}...")
+    def ls(self, path=".") -> str:
         subdir = self.dir
-        if name:
-            subdir = subdir / f"{name}"
+        if path:
+            subdir = subdir / f"{path}"
         files = [str(f.relative_to(subdir)) for f in subdir.iterdir()]
         return "\n".join(files)
 
-    def read(self, name: str) -> str | None:
-        print(f"Reading {self.dir / name}...")
+    def read(self, path: str) -> str | None:
         try:
-            with safe_open(self.dir / f"{name}", "r", self.dir) as f:
+            with safe_open(self.dir / f"{path}", "r", self.dir) as f:
                 return f.read()
         except FileNotFoundError:
             return None
 
-    def read_bytes(self, name: str) -> bytes | None:
-        print(f"Reading binary {self.dir / name}...")
+    def read_bytes(self, path: str) -> bytes | None:
         try:
-            with safe_open_binary(self.dir / f"{name}", "rb", self.dir) as f:
+            with safe_open_binary(self.dir / f"{path}", "rb", self.dir) as f:
                 return f.read()
         except FileNotFoundError:
             return None
@@ -95,17 +92,12 @@ class ReadDir:
 
 @dataclass
 class ReadWriteDir(ReadDir):
-    def __post_init__(self):
-        self.dir.mkdir(parents=True, exist_ok=True)
-
-    def write(self, name: str, data: str) -> bool:
-        print(f"Writing {self.dir / name}...")
-        with safe_open(self.dir / f"{name}", "w", self.dir) as f:
+    def write(self, path: str, data: str) -> bool:
+        with safe_open(self.dir / f"{path}", "w", self.dir) as f:
             f.write(data)
         return True
 
-    def write_bytes(self, name: str, data: bytes) -> bool:
-        print(f"Writing bytes {self.dir / name}...")
-        with safe_open_binary(self.dir / f"{name}", "wb", self.dir) as f:
+    def write_bytes(self, path: str, data: bytes) -> bool:
+        with safe_open_binary(self.dir / f"{path}", "wb", self.dir) as f:
             f.write(data)
         return True

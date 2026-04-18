@@ -15,8 +15,8 @@ from rich.syntax import Syntax
 from logos.serializers import from_json, to_json
 from logos.tools import Sender
 
-DEFAULT_MODEL = "gemma4:latest"
-DEFAULT_WINDOW_SIZE = 3
+# DEFAULT_MODEL = "gemma4:latest"
+DEFAULT_MODEL = "nemotron-cascade-2"
 
 TOOL_CALL = "<execute_tool>"
 TOOL_CALL_END = "</execute_tool>"
@@ -53,12 +53,14 @@ class Bot:
     client: AsyncClient
 
     model: str = field(default=DEFAULT_MODEL)
-    window_size: int = field(default=DEFAULT_WINDOW_SIZE)
+    window_size: int = field(default=3)
+    tab_size: int = field(default=4)
     think: bool | Literal["low", "medium", "high"] = True
     tools: bool = True
 
     tool_set: dict[str, Callable] = field(default_factory=dict)
     messages: list[Message] = field(default_factory=list)
+    shutdown: bool = False
     user_interrupt: bool = True
 
     @classmethod
@@ -93,7 +95,7 @@ class Bot:
         if instance:
             impl = partial(func, instance)
             if namespace:
-                name = f"{namespace}_{name}"
+                name = f"{namespace}.{name}"
             # For some reason 'wraps' and 'partial' don't handle this properly.
             # from functools import WRAPPER_ASSIGNMENTS
             impl.__annotations__ = func.__annotations__
@@ -130,12 +132,16 @@ class Bot:
         print("Done")
 
     async def add_message(self, message: Message) -> None:
+        if message.role == "user":
+            self.user_interrupt = False
         if message.role == "assistant" and message.content:
             # Set up 'direct' chat
             await self.sender.send_nfty_message(message)
-
         # Also report the debug log as we go.
         await self.sender.send_nfty_thinking(message)
+        await self.store_message(message)
+
+    async def store_message(self, message: Message) -> None:
         self.messages.append(message)
         try:
             data = to_json(message)
@@ -166,9 +172,14 @@ class Bot:
         # accumulate the partial fields
         message: Message | None = None
         async for chunk in stream:
+            if self.user_interrupt:
+                return  # Early exit.
+
             if chunk.message.thinking:
+                print(chunk.message.thinking, end="")
                 thinking += chunk.message.thinking
             if chunk.message.content:
+                print(chunk.message.content, end="")
                 content += chunk.message.content
             if chunk.message.tool_calls:
                 tool_calls.extend(chunk.message.tool_calls)
@@ -206,7 +217,9 @@ class Bot:
                 tool_calls=(tool_calls + extra_tool_calls) or None,
                 images=images or None,
             )
-            self.render_messages(console, extra=message, finished=False)
+            # self.render_messages(console, extra=message, finished=False)
+            # console.clear()
+            # self.render_message(console, message, finished=False)
 
         if message is None:
             raise ValueError("No chunks recieved")
@@ -221,10 +234,7 @@ class Bot:
         # execute the appropriate tool
         tool = self.tool_set.get(call.function.name)
         maybe_result = tool(**call.function.arguments) if tool else "Unknown tool"
-        if isinstance(maybe_result, Awaitable):
-            result = await maybe_result
-        else:
-            result = maybe_result
+        result = str(await maybe_result) if isinstance(maybe_result, Awaitable) else str(maybe_result)
         # add the tool result to the messages
         func = render_function(call.function)
         await self.add_message(
@@ -245,8 +255,8 @@ class Bot:
         out: ConsoleRenderable | str
         if message.tool_name and message.content:
             console.print(message.tool_name, style="red")
-            out = Markdown(message.content)
-            out = IndentedRenderable(out, 4)
+            out = "\n".join("\t" + line for line in message.content.split("\n"))
+            out = Syntax(out, "python", word_wrap=True)
             console.print(out, style="yellow")
         else:
             if message.thinking:
@@ -255,7 +265,7 @@ class Bot:
                 if not finished:
                     out += "..."
                 out = Markdown(out)
-                out = IndentedRenderable(out, 4)
+                out = IndentedRenderable(out, self.tab_size)
                 console.print(out, style="yellow")
             if message.content:
                 console.print(message.role, style="red")
@@ -263,14 +273,14 @@ class Bot:
                 if not finished:
                     out += "..."
                 out = Markdown(out)
-                out = IndentedRenderable(out, 4)
+                out = IndentedRenderable(out, self.tab_size)
                 console.print(out, style="green")
             if message.tool_calls:
                 out = "tool_calls"
                 console.print(out, style="red")
                 for call in message.tool_calls:
                     out = render_function(call.function)
-                    out = IndentedRenderable(out, 4)
+                    out = IndentedRenderable(out, self.tab_size)
                     console.print(out, style="yellow")
         if message.images:
             console.print(message.images, style="red")
