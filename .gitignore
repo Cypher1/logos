@@ -1,2 +1,5 @@
 workdir
 .env
+target
+*.db
+*.db/*
