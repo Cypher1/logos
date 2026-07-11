@@ -4,12 +4,12 @@
 //! storing and retrieving knowledge base tuples using sled.
 
 pub mod tuple;
+#[cfg(test)]
 mod tests;
 
 pub use tuple::Tuple;
 
 use sled::{Db};
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::result;
 

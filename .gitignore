@@ -3,3 +3,4 @@ workdir
 target
 *.db
 *.db/*
+.agents
