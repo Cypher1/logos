@@ -1,7 +1,7 @@
-//! Knowledge Base module for Logos, using sled as an embedded database.
+//! Knowledge Base module for Logos, using redb as an embedded database.
 //!
 //! This module provides the core data structures and functionality for
-//! storing and retrieving knowledge base tuples using sled.
+//! storing and retrieving knowledge base tuples using redb.
 
 pub mod tuple;
 #[cfg(test)]
@@ -9,19 +9,29 @@ mod tests;
 
 pub use tuple::Tuple;
 
-use sled::{Db};
+use redb::{Database, TableDefinition, ReadableDatabase, ReadableTable};
 use std::error::Error;
 use std::result;
 
-/// A simple wrapper around sled's database to manage tuples.
+const TUPLES_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples");
+
+/// A simple wrapper around redb's database to manage tuples.
 pub struct KB {
-    db: Db,
+    db: Database,
 }
 
 impl KB {
     /// Creates a new KnowledgeBase instance.
     pub fn new(path: impl AsRef<std::path::Path>) -> result::Result<Self, Box<dyn Error>> {
-        let db = sled::open(path)?;
+        let db = Database::create(path)?;
+        
+        // Initialize the table by opening a write transaction and committing it
+        let write_txn = db.begin_write()?;
+        {
+            let _table = write_txn.open_table(TUPLES_TABLE)?;
+        }
+        write_txn.commit()?;
+        
         Ok(KB { db })
     }
 
@@ -29,7 +39,13 @@ impl KB {
     pub fn store_tuple(&self, tuple: &Tuple) -> result::Result<(), Box<dyn Error>> {
         let key = format!("{}::{}::{}", tuple.subject, tuple.predicate, tuple.object);
         let value = serde_json::to_vec(tuple)?;
-        self.db.insert(key.as_bytes(), value)?;
+        
+        let write_txn = self.db.begin_write()?;
+        {
+            let mut table = write_txn.open_table(TUPLES_TABLE)?;
+            table.insert(key.as_str(), value.as_slice())?;
+        }
+        write_txn.commit()?;
         Ok(())
     }
 
@@ -41,26 +57,34 @@ impl KB {
         object: &str,
     ) -> result::Result<Option<Tuple>, Box<dyn Error>> {
         let key = format!("{}::{}::{}", subject, predicate, object);
-        if let Some(value) = self.db.get(key.as_bytes())? {
-            let tuple: Tuple = serde_json::from_slice(&value)?;
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(TUPLES_TABLE)?;
+        if let Some(guard) = table.get(key.as_str())? {
+            let tuple: Tuple = serde_json::from_slice(guard.value())?;
             Ok(Some(tuple))
         } else {
             Ok(None)
         }
     }
 
-    /// Iterates over all tuples in the knowledge base.
-    pub fn iter(&self) -> impl Iterator<Item = result::Result<Tuple, Box<dyn Error>>> {
-        self.db.iter().map(|result| {
-            let (_, value) = result.map_err(|e| -> Box<dyn Error> { e.into() })?;
-            let tuple: Tuple = serde_json::from_slice(&value).map_err(|e| -> Box<dyn Error> { e.into() })?;
-            Ok(tuple)
-        })
+    /// Retrieves all tuples from the knowledge base.
+    pub fn get_all_tuples(&self) -> result::Result<Vec<Tuple>, Box<dyn Error>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(TUPLES_TABLE)?;
+        let mut tuples = Vec::new();
+        
+        let mut iter = table.iter()?;
+        while let Some(res) = iter.next() {
+            let (_key_guard, val_guard) = res?;
+            let tuple: Tuple = serde_json::from_slice(val_guard.value())?;
+            tuples.push(tuple);
+        }
+        
+        Ok(tuples)
     }
 
     /// Shuts down the database.
     pub fn shutdown(self) -> result::Result<(), Box<dyn Error>> {
-        self.db.flush()?;
         Ok(())
     }
 }

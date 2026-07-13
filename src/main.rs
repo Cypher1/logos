@@ -344,18 +344,10 @@ fn update_kb_view(ui: &mut LogosUI, kb: &KB) -> Result<(), Box<dyn Error>> {
     // Clear the current knowledge base display
     ui.knowledge_base.clear();
     let mut count = 0;
-    let mut iter = kb.iter();
-    while let Some(item) = iter.next() {
-        match item {
-            Ok(tuple) => {
-                ui.knowledge_base.push(tuple.to_string());
-                count += 1;
-            }
-            Err(e) => {
-                ui.system_state = format!("Error reading KB: {}", e);
-                return Err(e.into());
-            }
-        }
+    let tuples = kb.get_all_tuples()?;
+    for tuple in tuples {
+        ui.knowledge_base.push(tuple.to_string());
+        count += 1;
     }
     ui.system_state = format!("Loaded {} tuples from KB", count);
     Ok(())
