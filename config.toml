@@ -1,0 +1,14 @@
+# Logos Configuration
+
+# The AI model used for inference.
+# Examples: "gpt-4o", "claude-3-5-sonnet", "gemma4:latest"
+model = "gemma4:12b-agent-20gbGPU"
+
+# Temperature setting (0.0 to 1.0).
+temperature = 0.7
+
+# Max tokens for a single response.
+max_tokens = 65536
+
+# Whether to enable logging of all requests and responses.
+enable_logging = true

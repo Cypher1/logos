@@ -1,8 +1,10 @@
 mod kb;
 mod ui;
+mod config;
 
 use crate::kb::{Tuple, KB};
 use crate::ui::{LogosUI, UIFocus};
+use crate::config::Config;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
@@ -25,6 +27,10 @@ enum OllamaMessage {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // Load configuration
+    let config = Config::load()?;
+    println!("Loaded config: {:?}", config);
+
     // Initialize the knowledge base
     let kb = KB::new("logos.db")?;
     // Insert a test tuple
