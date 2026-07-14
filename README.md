@@ -11,14 +11,14 @@ Unlike traditional large language models (LLMs) which operate on statistical pat
 ## 🛠️ Technical Stack & Architecture
 The system core will be developed in **Rust** due to its memory safety, performance characteristics, and suitability for systems programming—critical for minimizing unpredictable runtime errors.
 
-*   **Persistence Layer:** `sled` (Embedded Database) - Chosen for its high-performance, persistent, transactional key-value store, providing a robust backbone for our structured Knowledge Base (KB).
+*   **Persistence Layer:** `redb` (Embedded Database) - Chosen for its high-performance, persistent, ACID-compliant database engine, providing a robust backbone for our structured Knowledge Base (KB).
 *   **Asynchronous Operations:** `tokio` - For managing concurrent I/O operations required when interacting with external services or processing multi-threaded simulations.
 *   **LLM Integration & I/O:** `ollama` - Used as the reliable, local interface for generative knowledge retrieval and interpretation tasks, minimizing reliance on external API uptime while providing necessary NLP capabilities.
 *   **Interface Layer (TUI):** `ratatui` - Selected for building a responsive, single-pane Text User Interface that allows users to interact directly with the engine's state, view inference paths step-by-step, and monitor background simulations without external tooling.
 *   **Memory Optimization:** `lasso` (String Interning) - Critical for managing massive amounts of textual data associated with complex reasoning steps or large game board states by ensuring identical strings occupy only one memory address.
 
 ## 🧩 Key Architectural Components
-1.  **The Knowledge Base (KB):** A structured graph derived from `sled`. This stores facts, rules, observed outcomes, and evidence pointers, moving beyond simple text storage into relationship mapping.
+1.  **The Knowledge Base (KB):** A structured graph derived from `redb`. This stores facts, rules, observed outcomes, and evidence pointers, moving beyond simple text storage into relationship mapping.
 2.  **Inferential Engine:** The core reasoning module responsible for traversing the KB, applying probabilistic models, and generating chains of deduction ($\text{A} \rightarrow \text{B}$ based on Premise $\text{C}$).
 3.  **Simulation & Planning Module (MCTS):** For decision-making in complex stochastic environments (like games), we implement a Monte Carlo Tree Search guided by the KB state.
 4.  **TUI Interface Layer:** The primary user interaction point, responsible for rendering the engine's current operational state, allowing users to input domain prompts, initiate simulations, and visualize the reasoning stack interactively *without* needing to parse raw command-line output.
