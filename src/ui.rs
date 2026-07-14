@@ -19,7 +19,7 @@ pub enum UIFocus {
 }
 
 /// Main UI structure for Logos system
-pub struct LogosUI {
+pub struct LogosUI<'a> {
     /// Chat message history
     pub messages: Vec<String>,
     /// Knowledge base content
@@ -53,10 +53,10 @@ pub struct LogosUI {
     /// Cached Input area
     pub input_area: Rect,
     /// Text area for input (replaced simple string)
-    pub input_textarea: ratatui_textarea::TextArea,
+    pub input_textarea: ratatui_textarea::TextArea<'a>,
 }
 
-impl LogosUI {
+impl<'a> LogosUI<'a> {
     /// Create a new LogosUI instance
     pub fn new() -> Self {
         Self {
@@ -98,7 +98,7 @@ impl LogosUI {
                 Constraint::Min(10),   // Main content
                 Constraint::Length(3), // Input
             ])
-            .split(frame.size());
+            .split(frame.area());
 
         self.render_status_bar(frame, chunks[0]);
         self.render_main_content(frame, chunks[1]);
@@ -126,7 +126,7 @@ impl LogosUI {
             .constraints([
                 Constraint::Percentage(70), // Chat panel (main)
                 Constraint::Percentage(30), // Knowledge base + planning
-        ])
+            ])
             .split(area);
 
         self.chat_area = chunks[0];
@@ -137,7 +137,7 @@ impl LogosUI {
             .constraints([
                 Constraint::Percentage(50), // Knowledge base
                 Constraint::Percentage(50), // Planning / Simulation
-        ])
+            ])
             .split(side_bar);
 
         self.kb_area = chunks[0];
@@ -184,7 +184,7 @@ impl LogosUI {
             .map(|msg| Line::from(vec![Span::raw(msg.clone())]))
             .collect();
 
-        let inner_area = area.inner(&Margin::new(1, 1));
+        let inner_area = area.inner(Margin::new(1, 1));
         let inner_height = inner_area.height as usize;
         let total_lines = self.messages.len();
         let max_scroll = total_lines.saturating_sub(inner_height);
@@ -206,7 +206,7 @@ impl LogosUI {
 
             frame.render_stateful_widget(
                 scrollbar,
-                area.inner(&Margin {
+                area.inner(Margin {
                     vertical: 1,
                     horizontal: 0,
                 }),
@@ -251,7 +251,7 @@ impl LogosUI {
             .map(|entry| Line::from(vec![Span::raw(entry.clone())]))
             .collect();
 
-        let inner_area = area.inner(&Margin::new(1, 1));
+        let inner_area = area.inner(Margin::new(1, 1));
         let inner_height = inner_area.height as usize;
         let total_lines = self.knowledge_base.len();
         let max_scroll = total_lines.saturating_sub(inner_height);
@@ -273,7 +273,7 @@ impl LogosUI {
 
             frame.render_stateful_widget(
                 scrollbar,
-                area.inner(&Margin {
+                area.inner(Margin {
                     vertical: 1,
                     horizontal: 0,
                 }),
@@ -322,7 +322,7 @@ impl LogosUI {
             .map(|line| Line::from(vec![Span::raw(line.clone())]))
             .collect();
 
-        let inner_area = area.inner(&Margin::new(1, 1));
+        let inner_area = area.inner(Margin::new(1, 1));
         let inner_height = inner_area.height as usize;
         let total_lines = lines.len();
         let max_scroll = total_lines.saturating_sub(inner_height);
@@ -340,12 +340,11 @@ impl LogosUI {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .end_symbol(Some("▼"));
-            let mut scrollbar_state =
-                ScrollbarState::new(total_lines).position(self.planning_scroll);
+            let mut scrollbar_state = ScrollbarState::new(total_lines).position(self.planning_scroll);
 
             frame.render_stateful_widget(
                 scrollbar,
-                area.inner(&Margin {
+                area.inner(Margin {
                     vertical: 1,
                     horizontal: 0,
                 }),
@@ -385,6 +384,6 @@ impl LogosUI {
         // Draw the textarea widget inside the input area
         let mut textarea = self.input_textarea.clone();
         textarea.set_block(block);
-        frame.render_widget(textarea, area);
+        frame.render_widget(&textarea, area);
     }
 }
