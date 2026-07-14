@@ -70,13 +70,6 @@ impl Tuple {
         }
     }
 
-    /// Converts the tuple to a human-readable string representation.
-    ///
-    /// The format is: "subject predicate object (confidence)"
-    pub fn to_string(&self) -> String {
-        format!("{}", self)
-    }
-
     /// Calculates an ID from the hash.
     pub fn id(&self) -> u64 {
         use std::collections::hash_map::DefaultHasher;
@@ -91,6 +84,9 @@ impl Tuple {
 }
 
 impl std::fmt::Display for Tuple {
+    /// Converts the tuple to a human-readable string representation.
+    ///
+    /// The format is: "subject predicate object (confidence)"
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

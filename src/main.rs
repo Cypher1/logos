@@ -245,7 +245,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 if ui.history_pos > 0 {
                                     ui.history_pos -= 1;
                                     if ui.history_pos == 0 {
-                                        if ui.input_history.len() > 0 {
+                                        if !ui.input_history.is_empty() {
                                             ui.input = ui.input_history.remove(0);
                                         } else {
                                             ui.input = String::new();
@@ -269,6 +269,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     ui.input.clear();
                                     ui.cursor_pos = 0;
                                     let tx = tx.clone();
+                                    let model = config.model.clone();
                                     thread::spawn(move || {
                                         let rt = match Runtime::new() {
                                             Ok(rt) => rt,
@@ -282,7 +283,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                             let ollama = Ollama::default();
                                             let mut stream = match ollama
                                                 .generate_stream(GenerationRequest::new(
-                                                    "gemma4:31b".to_string(),
+                                                    model,
                                                     user_input,
                                                 ))
                                                 .await

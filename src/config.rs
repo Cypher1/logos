@@ -1,6 +1,5 @@
 use serde::Deserialize;
 use std::fs;
-use std::path::Path;
 use std::error::Error;
 
 #[derive(Debug, Deserialize)]
@@ -13,7 +12,15 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Result<Self, Box<dyn Error>> {
-        let path = Path::from("config.toml");
+        let path = if let Ok(x_dg_config_home) = std::env::var("XDG_CONFIG_HOME") {
+            std::path::PathBuf::from(x_dg_config_home).join("logos/config.toml")
+        } else {
+            let mut p = std::path::PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+            p.push(".config");
+            p.push("logos");
+            p.push("config.toml");
+            p
+        };
         if !path.exists() {
             // Default configuration if file is missing
             return Ok(Config {
