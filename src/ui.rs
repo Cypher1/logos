@@ -52,6 +52,8 @@ pub struct LogosUI {
     pub planning_area: Rect,
     /// Cached Input area
     pub input_area: Rect,
+    /// Text area for input (replaced simple string)
+    pub input_textarea: ratatui_textarea::TextArea,
 }
 
 impl LogosUI {
@@ -63,8 +65,7 @@ impl LogosUI {
                 "Welcome to the Logos system interface.".to_string(),
             ],
             knowledge_base: vec![
-                "Knowledge base initialized successfully".to_string(),
-                "Loaded 123 knowledge entries".to_string(),
+                "Loading knowledge entries...".to_string(),
             ],
             planning_status: "Ready for new task".to_string(),
             system_state: "Operational".to_string(),
@@ -80,6 +81,7 @@ impl LogosUI {
             kb_area: Rect::default(),
             planning_area: Rect::default(),
             input_area: Rect::default(),
+            input_textarea: ratatui_textarea::TextArea::default(),
         }
     }
 
@@ -122,19 +124,28 @@ impl LogosUI {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(60), // Chat panel (main)
-                Constraint::Percentage(20), // Knowledge base
-                Constraint::Percentage(20), // Planning/simulation
-            ])
+                Constraint::Percentage(70), // Chat panel (main)
+                Constraint::Percentage(30), // Knowledge base + planning
+        ])
             .split(area);
 
         self.chat_area = chunks[0];
-        self.kb_area = chunks[1];
-        self.planning_area = chunks[2];
+        let side_bar = chunks[1];
 
-        self.render_chat_panel(frame, chunks[0]);
-        self.render_knowledge_base_panel(frame, chunks[1]);
-        self.render_planning_panel(frame, chunks[2]);
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(50), // Knowledge base
+                Constraint::Percentage(50), // Planning / Simulation
+        ])
+            .split(side_bar);
+
+        self.kb_area = chunks[0];
+        self.planning_area = chunks[1];
+
+        self.render_knowledge_base_panel(frame, self.kb_area);
+        self.render_chat_panel(frame, self.chat_area);
+        self.render_planning_panel(frame, self.planning_area);
     }
 
     /// Render the chat panel showing conversation history
@@ -371,18 +382,9 @@ impl LogosUI {
             .borders(Borders::ALL)
             .border_style(border_style);
 
-        // Display the current input with a prompt and cursor
-        let input_with_prompt = format!("> {}", self.input);
-        // Add cursor position (adjusting for the "> " prefix)
-        let cursor_x = 2 + self.cursor_pos as u16; // 2 for "> "
-
-        let spans = vec![Span::raw(input_with_prompt)];
-        let line = Line::from(spans);
-        let text = Text::from(vec![line]);
-        let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
-
-        let inner_area = area.inner(&Margin::new(1, 1));
-        frame.set_cursor(inner_area.x + cursor_x, inner_area.y);
-        frame.render_widget(paragraph, area);
+        // Draw the textarea widget inside the input area
+        let mut textarea = self.input_textarea.clone();
+        textarea.set_block(block);
+        frame.render_widget(textarea, area);
     }
 }
