@@ -2,8 +2,8 @@
 //!
 //! This module provides the core data structures and functionality for
 //! storing and retrieving knowledge base tuples using redb.
-//!
-#![cfg(test)]
+
+#[cfg(test)]
 mod tests;
 pub mod tuple;
 
