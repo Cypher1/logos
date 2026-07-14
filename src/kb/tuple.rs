@@ -76,6 +76,18 @@ impl Tuple {
     pub fn to_string(&self) -> String {
         format!("{}", self)
     }
+
+    /// Calculates an ID from the hash.
+    pub fn id(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut s = DefaultHasher::new();
+        self.subject.hash(&mut s);
+        self.predicate.hash(&mut s);
+        self.object.hash(&mut s);
+        s.finish()
+    }
 }
 
 impl std::fmt::Display for Tuple {

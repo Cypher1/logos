@@ -48,6 +48,18 @@ impl KB {
         {
             let mut table = write_txn.open_table(TUPLES_TABLE)?;
             table.insert(key.as_str(), value.as_slice())?;
+
+            // Index by predicate
+            let mut pred_table = write_txn.open_table(PREDICATE_TABLE)?;
+            pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), key.as_str())?;
+
+            // Index by subject
+            let mut sub_table = write_txn.open_table(SUBJECT_TABLE)?;
+            sub_table.insert(format!("sub::{}", tuple.subject).as_str(), key.as_str())?;
+
+            // Index by object
+            let mut obj_table = write_txn.open_table(OBJECT_TABLE)?;
+            obj_table.insert(format!("obj::{}", tuple.object).as_str(), key.as_str())?;
         }
         write_txn.commit()?;
         Ok(())

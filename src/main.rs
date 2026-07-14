@@ -1,13 +1,12 @@
 mod kb;
 mod ui;
 
-use crate::kb::{Ent::*, Tuple, KB};
+use crate::kb::{Tuple, KB};
 use crate::ui::{LogosUI, UIFocus};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    ExecutableCommand,
 };
 use futures_util::StreamExt;
 use ollama_rs::generation::completion::request::GenerationRequest;
