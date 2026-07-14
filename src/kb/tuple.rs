@@ -50,14 +50,18 @@ pub struct Tuple {
 
     /// The confidence of the tuple (false: 0, true: 1)
     pub confidence: f32,
-
     // TODO: Add an optional time.
     // TODO: Add an optional world.
 }
 
 impl Tuple {
     /// Creates a new tuple.
-    pub fn new(subject: impl Into<Ent>, predicate: impl Into<Ent>, object: impl Into<Ent>, confidence: f32) -> Self {
+    pub fn new(
+        subject: impl Into<Ent>,
+        predicate: impl Into<Ent>,
+        object: impl Into<Ent>,
+        confidence: f32,
+    ) -> Self {
         Tuple {
             subject: subject.into(),
             predicate: predicate.into(),
@@ -78,7 +82,8 @@ impl std::fmt::Display for Tuple {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} {} {} ({:.2})", self.subject, self.predicate, self.object, self.confidence
+            "{} {} {} ({:.2})",
+            self.subject, self.predicate, self.object, self.confidence
         )
     }
 }

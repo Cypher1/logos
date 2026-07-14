@@ -3,14 +3,14 @@
 //! This module provides the core data structures and functionality for
 //! storing and retrieving knowledge base tuples using redb.
 
-pub mod tuple;
 #[cfg(test)]
 mod tests;
+pub mod tuple;
 
-pub use tuple::Tuple;
 pub use tuple::Ent;
+pub use tuple::Tuple;
 
-use redb::{Database, TableDefinition, ReadableDatabase, ReadableTable};
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use std::error::Error;
 use std::result;
 
@@ -28,14 +28,14 @@ impl KB {
     /// Creates a new KnowledgeBase instance.
     pub fn new(path: impl AsRef<std::path::Path>) -> result::Result<Self, Box<dyn Error>> {
         let db = Database::create(path)?;
-        
+
         // Initialize the table by opening a write transaction and committing it
         let write_txn = db.begin_write()?;
         {
             let _table = write_txn.open_table(TUPLES_TABLE)?;
         }
         write_txn.commit()?;
-        
+
         Ok(KB { db })
     }
 
@@ -43,7 +43,7 @@ impl KB {
     pub fn store_tuple(&self, tuple: &Tuple) -> result::Result<(), Box<dyn Error>> {
         let key = format!("{}::{}::{}", tuple.subject, tuple.predicate, tuple.object);
         let value = serde_json::to_vec(tuple)?;
-        
+
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TUPLES_TABLE)?;
@@ -60,7 +60,12 @@ impl KB {
         predicate: impl Into<Ent>,
         object: impl Into<Ent>,
     ) -> result::Result<Option<Tuple>, Box<dyn Error>> {
-        let key = format!("{}::{}::{}", subject.into(), predicate.into(), object.into());
+        let key = format!(
+            "{}::{}::{}",
+            subject.into(),
+            predicate.into(),
+            object.into()
+        );
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
         if let Some(guard) = table.get(key.as_str())? {
@@ -76,19 +81,14 @@ impl KB {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
         let mut tuples = Vec::new();
-        
+
         let mut iter = table.iter()?;
         while let Some(res) = iter.next() {
             let (_key_guard, val_guard) = res?;
             let tuple: Tuple = serde_json::from_slice(val_guard.value())?;
             tuples.push(tuple);
         }
-        
-        Ok(tuples)
-    }
 
-    /// Shuts down the database.
-    pub fn shutdown(self) -> result::Result<(), Box<dyn Error>> {
-        Ok(())
+        Ok(tuples)
     }
 }

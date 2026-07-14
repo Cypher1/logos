@@ -1,23 +1,23 @@
 mod kb;
 mod ui;
 
-use crate::kb::{Tuple, KB, Ent::*};
+use crate::kb::{Ent::*, Tuple, KB};
 use crate::ui::{LogosUI, UIFocus};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyModifiers, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    ExecutableCommand,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    ExecutableCommand,
 };
 use futures_util::StreamExt;
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::Ollama;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use signal_hook::consts::signal::*;
 use std::error::Error;
 use std::io::stdout;
 use std::sync::mpsc;
 use std::thread;
-use signal_hook::consts::signal::*;
 use tokio::runtime::Runtime;
 
 enum OllamaMessage {
@@ -94,8 +94,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let row = mouse_event.row;
 
                 let contains = |rect: ratatui::layout::Rect| -> bool {
-                    col >= rect.x && col < rect.x + rect.width &&
-                    row >= rect.y && row < rect.y + rect.height
+                    col >= rect.x
+                        && col < rect.x + rect.width
+                        && row >= rect.y
+                        && row < rect.y + rect.height
                 };
 
                 match mouse_event.kind {
@@ -139,12 +141,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('z') {
                     // Suspend
                     disable_raw_mode().unwrap();
-                    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+                    execute!(
+                        terminal.backend_mut(),
+                        LeaveAlternateScreen,
+                        DisableMouseCapture
+                    )?;
                     signal_hook::low_level::emulate_default_handler(SIGTSTP).unwrap();
 
                     // Resume
                     enable_raw_mode().unwrap();
-                    execute!(terminal.backend_mut(), EnterAlternateScreen, EnableMouseCapture)?;
+                    execute!(
+                        terminal.backend_mut(),
+                        EnterAlternateScreen,
+                        EnableMouseCapture
+                    )?;
                     terminal.clear()?;
                     continue;
                 }
@@ -167,32 +177,28 @@ fn main() -> Result<(), Box<dyn Error>> {
                             UIFocus::Planning => UIFocus::KB,
                         };
                     }
-                    KeyCode::PageUp => {
-                        match ui.focus {
-                            UIFocus::Input | UIFocus::Chat => {
-                                ui.chat_scroll = ui.chat_scroll.saturating_sub(5);
-                            }
-                            UIFocus::KB => {
-                                ui.kb_scroll = ui.kb_scroll.saturating_sub(5);
-                            }
-                            UIFocus::Planning => {
-                                ui.planning_scroll = ui.planning_scroll.saturating_sub(5);
-                            }
+                    KeyCode::PageUp => match ui.focus {
+                        UIFocus::Input | UIFocus::Chat => {
+                            ui.chat_scroll = ui.chat_scroll.saturating_sub(5);
                         }
-                    }
-                    KeyCode::PageDown => {
-                        match ui.focus {
-                            UIFocus::Input | UIFocus::Chat => {
-                                ui.chat_scroll = ui.chat_scroll.saturating_add(5);
-                            }
-                            UIFocus::KB => {
-                                ui.kb_scroll = ui.kb_scroll.saturating_add(5);
-                            }
-                            UIFocus::Planning => {
-                                ui.planning_scroll = ui.planning_scroll.saturating_add(5);
-                            }
+                        UIFocus::KB => {
+                            ui.kb_scroll = ui.kb_scroll.saturating_sub(5);
                         }
-                    }
+                        UIFocus::Planning => {
+                            ui.planning_scroll = ui.planning_scroll.saturating_sub(5);
+                        }
+                    },
+                    KeyCode::PageDown => match ui.focus {
+                        UIFocus::Input | UIFocus::Chat => {
+                            ui.chat_scroll = ui.chat_scroll.saturating_add(5);
+                        }
+                        UIFocus::KB => {
+                            ui.kb_scroll = ui.kb_scroll.saturating_add(5);
+                        }
+                        UIFocus::Planning => {
+                            ui.planning_scroll = ui.planning_scroll.saturating_add(5);
+                        }
+                    },
                     // Focus-dependent keys
                     _ => match ui.focus {
                         UIFocus::Input => match key.code {
@@ -249,7 +255,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 if !ui.input.is_empty() {
                                     let user_input = ui.input.clone();
                                     ui.messages.push(format!("You: {}", user_input));
-                                    if ui.input_history.is_empty() || ui.input_history[0] != user_input {
+                                    if ui.input_history.is_empty()
+                                        || ui.input_history[0] != user_input
+                                    {
                                         ui.input_history.insert(0, user_input.clone());
                                     }
                                     ui.history_pos = 0;
@@ -267,10 +275,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                         rt.block_on(async move {
                                             let ollama = Ollama::default();
-                                            let mut stream = match ollama.generate_stream(GenerationRequest::new(
-                                                "gemma4:31b".to_string(),
-                                                user_input,
-                                            )).await {
+                                            let mut stream = match ollama
+                                                .generate_stream(GenerationRequest::new(
+                                                    "gemma4:31b".to_string(),
+                                                    user_input,
+                                                ))
+                                                .await
+                                            {
                                                 Ok(s) => s,
                                                 Err(e) => {
                                                     let _ = tx.send(Err(Box::new(e)));
@@ -287,7 +298,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                                             chunk.push_str(&response.response);
                                                         }
                                                         full_response.push_str(&chunk);
-                                                        let _ = tx.send(Ok(OllamaMessage::Chunk(chunk)));
+                                                        let _ = tx
+                                                            .send(Ok(OllamaMessage::Chunk(chunk)));
                                                     }
                                                     Err(e) => {
                                                         let _ = tx.send(Err(Box::new(e)));
@@ -295,7 +307,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                                     }
                                                 }
                                             }
-                                            let _ = tx.send(Ok(OllamaMessage::Final(full_response)));
+                                            let _ =
+                                                tx.send(Ok(OllamaMessage::Final(full_response)));
                                         });
                                     });
                                 }
@@ -333,7 +346,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                             _ => {}
                         },
-                    }
+                    },
                 }
             }
             _ => {}

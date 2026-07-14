@@ -3,9 +3,9 @@
 
 use ratatui::{
     layout::{Constraint, Direction, Layout, Margin, Rect},
-    style::{Color, Style, Modifier},
+    style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, Paragraph, Wrap, Scrollbar, ScrollbarOrientation, ScrollbarState},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
     Frame,
 };
 
@@ -111,9 +111,7 @@ impl LogosUI {
             .style(Style::default().fg(Color::Blue));
 
         let text = Text::raw(&self.system_state);
-        let paragraph = Paragraph::new(text)
-            .block(block)
-            .wrap(Wrap { trim: true });
+        let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
 
         frame.render_widget(paragraph, area);
     }
@@ -142,14 +140,24 @@ impl LogosUI {
     /// Render the chat panel showing conversation history
     fn render_chat_panel(&mut self, frame: &mut Frame, area: Rect) {
         let is_focused = self.focus == UIFocus::Chat;
-        let border_color = if is_focused { Color::White } else { Color::DarkGray };
+        let border_color = if is_focused {
+            Color::White
+        } else {
+            Color::DarkGray
+        };
         let border_style = Style::default().fg(border_color);
         let title_style = if is_focused {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
-        let title = if is_focused { "Chat Interface (Active)" } else { "Chat Interface" };
+        let title = if is_focused {
+            "Chat Interface (Active)"
+        } else {
+            "Chat Interface"
+        };
 
         let block = Block::default()
             .title(Span::styled(title, title_style))
@@ -183,12 +191,14 @@ impl LogosUI {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .end_symbol(Some("▼"));
-            let mut scrollbar_state = ScrollbarState::new(total_lines)
-                .position(self.chat_scroll);
+            let mut scrollbar_state = ScrollbarState::new(total_lines).position(self.chat_scroll);
 
             frame.render_stateful_widget(
                 scrollbar,
-                area.inner(&Margin { vertical: 1, horizontal: 0 }),
+                area.inner(&Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
                 &mut scrollbar_state,
             );
         }
@@ -197,14 +207,24 @@ impl LogosUI {
     /// Render the knowledge base management panel
     fn render_knowledge_base_panel(&mut self, frame: &mut Frame, area: Rect) {
         let is_focused = self.focus == UIFocus::KB;
-        let border_color = if is_focused { Color::Green } else { Color::DarkGray };
+        let border_color = if is_focused {
+            Color::Green
+        } else {
+            Color::DarkGray
+        };
         let border_style = Style::default().fg(border_color);
         let title_style = if is_focused {
-            Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
-        let title = if is_focused { "Knowledge Base (Active)" } else { "Knowledge Base" };
+        let title = if is_focused {
+            "Knowledge Base (Active)"
+        } else {
+            "Knowledge Base"
+        };
 
         let block = Block::default()
             .title(Span::styled(title, title_style))
@@ -238,12 +258,14 @@ impl LogosUI {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .end_symbol(Some("▼"));
-            let mut scrollbar_state = ScrollbarState::new(total_lines)
-                .position(self.kb_scroll);
+            let mut scrollbar_state = ScrollbarState::new(total_lines).position(self.kb_scroll);
 
             frame.render_stateful_widget(
                 scrollbar,
-                area.inner(&Margin { vertical: 1, horizontal: 0 }),
+                area.inner(&Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
                 &mut scrollbar_state,
             );
         }
@@ -252,14 +274,24 @@ impl LogosUI {
     /// Render the planning/simulation tools panel
     fn render_planning_panel(&mut self, frame: &mut Frame, area: Rect) {
         let is_focused = self.focus == UIFocus::Planning;
-        let border_color = if is_focused { Color::Yellow } else { Color::DarkGray };
+        let border_color = if is_focused {
+            Color::Yellow
+        } else {
+            Color::DarkGray
+        };
         let border_style = Style::default().fg(border_color);
         let title_style = if is_focused {
-            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
-        let title = if is_focused { "Planning/Simulation Tools (Active)" } else { "Planning/Simulation Tools" };
+        let title = if is_focused {
+            "Planning/Simulation Tools (Active)"
+        } else {
+            "Planning/Simulation Tools"
+        };
 
         let block = Block::default()
             .title(Span::styled(title, title_style))
@@ -269,7 +301,11 @@ impl LogosUI {
         frame.render_widget(block, area);
 
         // Display planning information
-        let lines: Vec<String> = self.planning_status.lines().map(|s| s.to_string()).collect();
+        let lines: Vec<String> = self
+            .planning_status
+            .lines()
+            .map(|s| s.to_string())
+            .collect();
         let text: Text = lines
             .iter()
             .map(|line| Line::from(vec![Span::raw(line.clone())]))
@@ -293,12 +329,15 @@ impl LogosUI {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .end_symbol(Some("▼"));
-            let mut scrollbar_state = ScrollbarState::new(total_lines)
-                .position(self.planning_scroll);
+            let mut scrollbar_state =
+                ScrollbarState::new(total_lines).position(self.planning_scroll);
 
             frame.render_stateful_widget(
                 scrollbar,
-                area.inner(&Margin { vertical: 1, horizontal: 0 }),
+                area.inner(&Margin {
+                    vertical: 1,
+                    horizontal: 0,
+                }),
                 &mut scrollbar_state,
             );
         }
@@ -308,14 +347,24 @@ impl LogosUI {
     fn render_input_area(&mut self, frame: &mut Frame, area: Rect) {
         self.input_area = area;
         let is_focused = self.focus == UIFocus::Input;
-        let border_color = if is_focused { Color::Cyan } else { Color::DarkGray };
+        let border_color = if is_focused {
+            Color::Cyan
+        } else {
+            Color::DarkGray
+        };
         let border_style = Style::default().fg(border_color);
         let title_style = if is_focused {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else {
             Style::default().fg(Color::DarkGray)
         };
-        let title = if is_focused { "Input (Active)" } else { "Input" };
+        let title = if is_focused {
+            "Input (Active)"
+        } else {
+            "Input"
+        };
 
         let block = Block::default()
             .title(Span::styled(title, title_style))
@@ -330,9 +379,7 @@ impl LogosUI {
         let spans = vec![Span::raw(input_with_prompt)];
         let line = Line::from(spans);
         let text = Text::from(vec![line]);
-        let paragraph = Paragraph::new(text)
-            .block(block)
-            .wrap(Wrap { trim: true });
+        let paragraph = Paragraph::new(text).block(block).wrap(Wrap { trim: true });
 
         let inner_area = area.inner(&Margin::new(1, 1));
         frame.set_cursor(inner_area.x + cursor_x, inner_area.y);
