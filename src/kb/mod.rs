@@ -91,7 +91,7 @@ impl KB {
         let mut tuples = Vec::new();
 
         let mut iter = table.iter()?;
-        while let Some(res) = iter.next() {
+        for res in iter {
             let (_key_guard, val_guard) = res?;
             let tuple: Tuple = serde_json::from_slice(val_guard.value())?;
             tuples.push(tuple);

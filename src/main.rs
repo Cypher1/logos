@@ -211,25 +211,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                                 ui.input.insert(ui.cursor_pos, c);
                                 ui.cursor_pos += 1;
                             }
-                            KeyCode::Backspace => {
-                                if ui.cursor_pos > 0 {
+                            KeyCode::Backspace
+                                if ui.cursor_pos > 0 => {
                                     ui.input.remove(ui.cursor_pos - 1);
                                     ui.cursor_pos -= 1;
                                 }
-                            }
-                            KeyCode::Left => {
-                                if ui.cursor_pos > 0 {
+                            KeyCode::Left
+                                if ui.cursor_pos > 0 => {
                                     ui.cursor_pos -= 1;
                                 }
-                            }
-                            KeyCode::Right => {
-                                if ui.cursor_pos < ui.input.len() {
+                            KeyCode::Right
+                                if ui.cursor_pos < ui.input.len() => {
                                     ui.cursor_pos += 1;
                                 }
-                            }
-                            KeyCode::Up => {
+                            KeyCode::Up
                                 // Navigate up in history
-                                if !ui.input_history.is_empty() {
+                                if !ui.input_history.is_empty() => {
                                     if ui.history_pos == 0 {
                                         ui.input_history.insert(0, ui.input.clone());
                                     }
@@ -239,10 +236,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                                         ui.cursor_pos = ui.input.len();
                                     }
                                 }
-                            }
-                            KeyCode::Down => {
+                            KeyCode::Down
                                 // Navigate down in history
-                                if ui.history_pos > 0 {
+                                if ui.history_pos > 0 => {
                                     ui.history_pos -= 1;
                                     if ui.history_pos == 0 {
                                         if !ui.input_history.is_empty() {
@@ -255,9 +251,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     }
                                     ui.cursor_pos = ui.input.len();
                                 }
-                            }
-                            KeyCode::Enter => {
-                                if !ui.input.is_empty() {
+                            KeyCode::Enter
+                                if !ui.input.is_empty() => {
                                     let user_input = ui.input.clone();
                                     ui.messages.push(format!("You: {}", user_input));
                                     if ui.input_history.is_empty()
@@ -318,7 +313,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                                         });
                                     });
                                 }
-                            }
                             _ => {}
                         },
                         UIFocus::Chat => match key.code {
