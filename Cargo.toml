@@ -16,3 +16,4 @@ ratatui-scrollview = "0.0.0"
 ollama-rs = { version = "0.3.5", features = ["tokio", "stream", "tool-implementations"] }
 futures-util = "0.3"
 redb = "4.1.0"
+signal-hook = "0.4.4"

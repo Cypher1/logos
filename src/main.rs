@@ -4,8 +4,9 @@ mod ui;
 use crate::kb::{Tuple, KB};
 use crate::ui::{LogosUI, UIFocus};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyModifiers, KeyCode},
     execute,
+    ExecutableCommand,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use futures_util::StreamExt;
@@ -16,6 +17,7 @@ use std::error::Error;
 use std::io::stdout;
 use std::sync::mpsc;
 use std::thread;
+use signal_hook::consts::signal::*;
 use tokio::runtime::Runtime;
 
 enum OllamaMessage {
@@ -134,6 +136,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             Event::Key(key) => {
+                if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('z') {
+                    // Suspend
+                    disable_raw_mode().unwrap();
+                    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+                    signal_hook::low_level::emulate_default_handler(SIGTSTP).unwrap();
+
+                    // Resume
+                    enable_raw_mode().unwrap();
+                    execute!(terminal.backend_mut(), EnterAlternateScreen, EnableMouseCapture)?;
+                    terminal.clear()?;
+                    continue;
+                }
                 match key.code {
                     // Global keys
                     KeyCode::Esc | KeyCode::Char('\u{4}') => break,
@@ -179,7 +193,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                         }
                     }
-
                     // Focus-dependent keys
                     _ => match ui.focus {
                         UIFocus::Input => match key.code {
