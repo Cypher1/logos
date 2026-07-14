@@ -8,12 +8,16 @@ pub mod tuple;
 mod tests;
 
 pub use tuple::Tuple;
+pub use tuple::Ent;
 
 use redb::{Database, TableDefinition, ReadableDatabase, ReadableTable};
 use std::error::Error;
 use std::result;
 
 const TUPLES_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples");
+const PREDICATE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples_by_predicate");
+const SUBJECT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples_by_subject");
+const OBJECT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples_by_object");
 
 /// A simple wrapper around redb's database to manage tuples.
 pub struct KB {
@@ -52,11 +56,11 @@ impl KB {
     /// Retrieves a tuple from the knowledge base by its key.
     pub fn retrieve_tuple(
         &self,
-        subject: &str,
-        predicate: &str,
-        object: &str,
+        subject: impl Into<Ent>,
+        predicate: impl Into<Ent>,
+        object: impl Into<Ent>,
     ) -> result::Result<Option<Tuple>, Box<dyn Error>> {
-        let key = format!("{}::{}::{}", subject, predicate, object);
+        let key = format!("{}::{}::{}", subject.into(), predicate.into(), object.into());
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
         if let Some(guard) = table.get(key.as_str())? {

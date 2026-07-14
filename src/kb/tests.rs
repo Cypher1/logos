@@ -1,6 +1,6 @@
 //! Integration tests for the knowledge base module.
 
-use crate::kb::{Tuple, KB};
+use crate::kb::{Tuple, KB, Ent::*};
 use std::error::Error;
 use std::result;
 
@@ -14,7 +14,7 @@ fn test_kb_tuple_storage() -> Result<()> {
     let kb = KB::new("test.db")?;
 
     // Create a tuple
-    let tuple = Tuple::new("Alice", "knows", "Bob");
+    let tuple = Tuple::new("Alice", "knows", "Bob", 0.9);
 
     // Store the tuple
     kb.store_tuple(&tuple)?;

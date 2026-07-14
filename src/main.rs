@@ -1,7 +1,7 @@
 mod kb;
 mod ui;
 
-use crate::kb::{Tuple, KB};
+use crate::kb::{Tuple, KB, Ent::*};
 use crate::ui::{LogosUI, UIFocus};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyModifiers, KeyCode},
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Initialize the knowledge base
     let kb = KB::new("logos.db")?;
     // Insert a test tuple
-    let tuple = Tuple::new("Alice", "knows", "Bob");
+    let tuple = Tuple::new("Alice", "knows", "Bob", 0.9);
     kb.store_tuple(&tuple)?;
 
     // Set up the terminal
