@@ -2,8 +2,8 @@
 //!
 //! This module provides the core data structures and functionality for
 //! storing and retrieving knowledge base tuples using redb.
-
-#[cfg(test)]
+//!
+#![cfg(test)]
 mod tests;
 pub mod tuple;
 
@@ -14,10 +14,10 @@ use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
 use std::error::Error;
 use std::result;
 
-const TUPLES_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples");
-const PREDICATE_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples_by_predicate");
-const SUBJECT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples_by_subject");
-const OBJECT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("tuples_by_object");
+const TUPLES_TABLE: TableDefinition<u64, &[u8]> = TableDefinition::new("tuples");
+const PREDICATE_TABLE: TableDefinition<&str, u64> = TableDefinition::new("tuples_by_predicate");
+const SUBJECT_TABLE: TableDefinition<&str, u64> = TableDefinition::new("tuples_by_subject");
+const OBJECT_TABLE: TableDefinition<&str, u64> = TableDefinition::new("tuples_by_object");
 
 /// A simple wrapper around redb's database to manage tuples.
 pub struct KB {
@@ -41,25 +41,25 @@ impl KB {
 
     /// Inserts a tuple into the knowledge base.
     pub fn store_tuple(&self, tuple: &Tuple) -> result::Result<(), Box<dyn Error>> {
-        let key = format!("{}::{}::{}", tuple.subject, tuple.predicate, tuple.object);
+        let id = tuple.id();
         let value = serde_json::to_vec(tuple)?;
 
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TUPLES_TABLE)?;
-            table.insert(key.as_str(), value.as_slice())?;
+            table.insert(id, value.as_slice())?;
 
             // Index by predicate
             let mut pred_table = write_txn.open_table(PREDICATE_TABLE)?;
-            pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), key.as_str())?;
+            pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), &id)?;
 
             // Index by subject
             let mut sub_table = write_txn.open_table(SUBJECT_TABLE)?;
-            sub_table.insert(format!("sub::{}", tuple.subject).as_str(), key.as_str())?;
+            sub_table.insert(format!("sub::{}", tuple.subject).as_str(), &id)?;
 
             // Index by object
             let mut obj_table = write_txn.open_table(OBJECT_TABLE)?;
-            obj_table.insert(format!("obj::{}", tuple.object).as_str(), key.as_str())?;
+            obj_table.insert(format!("obj::{}", tuple.object).as_str(), &id)?;
         }
         write_txn.commit()?;
         Ok(())
@@ -72,20 +72,16 @@ impl KB {
         predicate: impl Into<Ent>,
         object: impl Into<Ent>,
     ) -> result::Result<Option<Tuple>, Box<dyn Error>> {
-        let key = format!(
-            "{}::{}::{}",
-            subject.into(),
-            predicate.into(),
-            object.into()
-        );
+        let tuple = Tuple::new(subject.into(), predicate.into(), object.into(), 0.5);
+        let id = tuple.id();
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
-        if let Some(guard) = table.get(key.as_str())? {
+        if let Some(guard) = table.get(&id)? {
             let tuple: Tuple = serde_json::from_slice(guard.value())?;
-            Ok(Some(tuple))
-        } else {
-            Ok(None)
+            return Ok(Some(tuple));
         }
+
+        Ok(None)
     }
 
     /// Retrieves all tuples from the knowledge base.

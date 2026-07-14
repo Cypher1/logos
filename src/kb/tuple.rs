@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// An entity in the storage system
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash)]
 pub enum Ent {
     /// A concept/idea.
     Entity(u64),
@@ -111,7 +111,6 @@ mod tests {
         assert_eq!(tuple.predicate, "knows".into());
         assert_eq!(tuple.object, "Bob".into());
         assert!(tuple.confidence > 0.8999);
-        assert!(tuple.confidence < 0.9001);
         assert!(tuple.confidence < 0.9001);
         assert_eq!(format!("{}", tuple), "'Alice' 'knows' 'Bob' (0.90)");
     }
