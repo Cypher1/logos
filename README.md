@@ -15,7 +15,7 @@ The system core will be developed in **Rust** due to its memory safety, performa
 *   **Asynchronous Operations:** `tokio` - For managing concurrent I/O operations required when interacting with external services or processing multi-threaded simulations.
 *   **LLM Integration & I/O:** `ollama` - Used as the reliable, local interface for generative knowledge retrieval and interpretation tasks, minimizing reliance on external API uptime while providing necessary NLP capabilities.
 *   **Interface Layer (TUI):** `ratatui` - Selected for building a responsive, single-pane Text User Interface that allows users to interact directly with the engine's state, view inference paths step-by-step, and monitor background simulations without external tooling.
-*   **Memory Optimization:** `lasso` (String Interning) - Critical for managing massive amounts of textual data associated with complex reasoning steps or large game board states by ensuring identical strings occupy only one memory address.
+*   **Memory Optimization:** Use of Entity and Tuple references (`Ent::Entity(u64)` and `Ent::Tuple(u64)`) to avoid large numbers of strings throughout the database.
 
 ## 🧩 Key Architectural Components
 1.  **The Knowledge Base (KB):** A structured graph derived from `redb`. This stores facts, rules, observed outcomes, and evidence pointers, moving beyond simple text storage into relationship mapping.
@@ -51,7 +51,7 @@ fn start_simulation(scene_id: &str, initial_params: SimulationParameters) -> tok
 This project will proceed iteratively across distinct milestones:
 
 1.  **Setup & Infrastructure:** (CURRENT) Establish repository tooling and foundational data structures (`README.md` creation).
-2.  **Knowledge Base Implementation:** Design serialization/deserialization patterns for storing complex tuples within `sled`. *Focus on defining the canonical tuple structure.*
+2.  **Knowledge Base Implementation:** Design serialization/deserialization patterns for storing complex tuples within `redb`. *Focus on defining the canonical tuple structure.*
 3.  **TUI Interface Stubbing:** Implement `AppState` management hooks and stub out `run_inference` to handle initial UI rendering pathways gracefully. (Addresses placeholder needs).
 4.  **MCTS Integration & Full Simulation:** Connect MCTS output probabilities, feeding results into a structured inference layer that the TUI can visualize turn-by-turn.
 5.  **Reasoning & Evaluation Loop Finalization:** Integrate all components, ensuring the TUI renders the full, auditable path from premise to conclusion using `ollama` only for contextual clarification between established facts.

@@ -23,7 +23,5 @@ fn test_kb_tuple_storage() -> Result<()> {
     let retrieved = kb.retrieve_tuple("Alice", "knows", "Bob")?;
     assert!(retrieved.is_some());
 
-    // Clean up
-    kb.shutdown()?;
     Ok(())
 }
