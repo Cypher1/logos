@@ -90,7 +90,7 @@ impl KB {
         let table = read_txn.open_table(TUPLES_TABLE)?;
         let mut tuples = Vec::new();
 
-        let mut iter = table.iter()?;
+        let iter = table.iter()?;
         for res in iter {
             let (_key_guard, val_guard) = res?;
             let tuple: Tuple = serde_json::from_slice(val_guard.value())?;

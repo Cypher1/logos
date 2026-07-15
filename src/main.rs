@@ -18,15 +18,14 @@ use signal_hook::consts::signal::*;
 use std::error::Error;
 use std::io::stdout;
 use std::sync::mpsc;
-use std::thread;
-use tokio::runtime::Runtime;
 
 enum OllamaMessage {
     Chunk(String),
     Final(String),
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     // Load configuration
     let config = Config::load()?;
     println!("Loaded config: {:?}", config);
@@ -172,8 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             let user_input = ui.input_textarea.lines().join("\n");
                             if !user_input.trim().is_empty() {
                                 ui.messages.push(format!("You: {}", user_input));
-                                if ui.input_history.is_empty() || ui.input_history[0] != user_input
-                                {
+                                if ui.input_history.is_empty() || ui.input_history[0] != user_input {
                                     ui.input_history.insert(0, user_input.clone());
                                 }
                                 ui.history_pos = 0;
@@ -181,50 +179,40 @@ fn main() -> Result<(), Box<dyn Error>> {
 
                                 let tx = tx.clone();
                                 let model = config.model.clone();
-                                thread::spawn(move || {
-                                    let rt = match Runtime::new() {
-                                        Ok(rt) => rt,
+                                tokio::spawn(async move {
+                                    let ollama = Ollama::default();
+                                    let mut stream = match ollama
+                                        .generate_stream(GenerationRequest::new(
+                                            model, user_input,
+                                        ))
+                                        .await
+                                    {
+                                        Ok(s) => s,
                                         Err(e) => {
                                             let _ = tx.send(Err(Box::new(e)));
                                             return;
                                         }
                                     };
 
-                                    rt.block_on(async move {
-                                        let ollama = Ollama::default();
-                                        let mut stream = match ollama
-                                            .generate_stream(GenerationRequest::new(
-                                                model, user_input,
-                                            ))
-                                            .await
-                                        {
-                                            Ok(s) => s,
+                                    let mut full_response = String::new();
+                                    while let Some(result) = stream.next().await {
+                                        match result {
+                                            Ok(responses) => {
+                                                let mut chunk = String::new();
+                                                for response in responses {
+                                                    chunk.push_str(&response.response);
+                                                }
+                                                full_response.push_str(&chunk);
+                                                let _ =
+                                                    tx.send(Ok(OllamaMessage::Chunk(chunk)));
+                                            }
                                             Err(e) => {
                                                 let _ = tx.send(Err(Box::new(e)));
                                                 return;
                                             }
-                                        };
-
-                                        let mut full_response = String::new();
-                                        while let Some(result) = stream.next().await {
-                                            match result {
-                                                Ok(responses) => {
-                                                    let mut chunk = String::new();
-                                                    for response in responses {
-                                                        chunk.push_str(&response.response);
-                                                    }
-                                                    full_response.push_str(&chunk);
-                                                    let _ =
-                                                        tx.send(Ok(OllamaMessage::Chunk(chunk)));
-                                                }
-                                                Err(e) => {
-                                                    let _ = tx.send(Err(Box::new(e)));
-                                                    return;
-                                                }
-                                            }
                                         }
-                                        let _ = tx.send(Ok(OllamaMessage::Final(full_response)));
-                                    });
+                                    }
+                                    let _ = tx.send(Ok(OllamaMessage::Final(full_response)));
                                 });
                             }
                         }

@@ -28,10 +28,6 @@ pub struct LogosUI<'a> {
     pub planning_status: String,
     /// Current system state
     pub system_state: String,
-    /// Current input buffer
-    pub input: String,
-    /// Cursor position in input buffer
-    pub cursor_pos: usize,
     /// Input history for up/down navigation
     pub input_history: Vec<String>,
     /// Current position in history navigation
@@ -52,7 +48,7 @@ pub struct LogosUI<'a> {
     pub planning_area: Rect,
     /// Cached Input area
     pub input_area: Rect,
-    /// Text area for input (replaced simple string)
+    /// Text area for input
     pub input_textarea: ratatui_textarea::TextArea<'a>,
 }
 
@@ -67,8 +63,6 @@ impl<'a> LogosUI<'a> {
             knowledge_base: vec!["Loading knowledge entries...".to_string()],
             planning_status: "Ready for new task".to_string(),
             system_state: "Operational".to_string(),
-            input: "".to_string(),
-            cursor_pos: 0,
             input_history: Vec::new(),
             history_pos: 0,
             focus: UIFocus::Input,
