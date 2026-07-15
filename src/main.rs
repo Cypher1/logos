@@ -180,11 +180,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                                     let tx = tx.clone();
                                     let model = config.model.clone();
+                                    let chat_history: String = ui.messages.iter().map(|m| m.clone()).collect::<Vec<_>>().join("\n");
                                     tokio::spawn(async move {
                                         let ollama = Ollama::default();
                                         let mut stream = match ollama
                                             .generate_stream(GenerationRequest::new(
-                                                model, user_input,
+                                                model, chat_history,
                                             ))
                                             .await
                                         {
