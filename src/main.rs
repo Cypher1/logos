@@ -218,22 +218,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         // clipboard shortcuts, etc.) is delegated straight to the
                         // TextArea widget rather than hand-rolled per key.
                         KeyCode::Up => {
-                            match ui.history_pos {
+                            let pos = match ui.history_pos {
                                 None => {
                                     let user_input = ui.input_textarea.lines().join("\n");
                                     if !user_input.trim().is_empty() {
                                         ui.input_history.insert(0, user_input);
-                                        ui.history_pos = Some(1);
+                                        1
+                                    } else {
+                                        0
                                     }
                                 }
-                                Some(pos) => {
+                                Some(mut pos) => {
                                     if pos < ui.input_history.len() {
-                                        ui.history_pos = Some(pos+1);
-                                        if let Some(hist) = ui.input_history.get(pos) {
-                                            ui.input_textarea = TextArea::from(hist.lines());
-                                        }
+                                        pos += 1;
                                     }
+                                    pos
                                 }
+                            };
+                            ui.history_pos = Some(pos);
+                            if let Some(hist) = ui.input_history.get(pos) {
+                                ui.input_textarea = TextArea::from(hist.lines());
                             }
                         }
                         KeyCode::Down => {
