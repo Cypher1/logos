@@ -31,7 +31,7 @@ pub struct LogosUI<'a> {
     /// Input history for up/down navigation
     pub input_history: Vec<String>,
     /// Current position in history navigation
-    pub history_pos: usize,
+    pub history_pos: Option<usize>,
     /// Currently focused panel
     pub focus: UIFocus,
     /// Chat scroll offset
@@ -64,7 +64,7 @@ impl<'a> LogosUI<'a> {
             planning_status: "Ready for new task".to_string(),
             system_state: "Operational".to_string(),
             input_history: Vec::new(),
-            history_pos: 0,
+            history_pos: None,
             focus: UIFocus::Input,
             chat_scroll: 0,
             kb_scroll: 0,

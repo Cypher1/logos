@@ -14,6 +14,7 @@ use futures_util::StreamExt;
 use ollama_rs::generation::completion::request::GenerationRequest;
 use ollama_rs::Ollama;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
 use std::error::Error;
 use std::io::stdout;
@@ -171,11 +172,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             let user_input = ui.input_textarea.lines().join("\n");
                             if !user_input.trim().is_empty() {
                                 ui.messages.push(format!("You: {}", user_input));
-                                if ui.input_history.is_empty() || ui.input_history[0] != user_input
-                                {
+                                if ui.input_history.is_empty() || ui.input_history[0] != user_input {
                                     ui.input_history.insert(0, user_input.clone());
                                 }
-                                ui.history_pos = 0;
+                                ui.history_pos = None;
                                 ui.input_textarea.clear();
 
                                 let tx = tx.clone();
@@ -218,23 +218,37 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         // clipboard shortcuts, etc.) is delegated straight to the
                         // TextArea widget rather than hand-rolled per key.
                         KeyCode::Up => {
-                            if ui.history_pos + 1 < ui.input_history.len() {
-                                ui.history_pos += 1;
-                                if let Some(hist) = ui.input_history.get(ui.history_pos) {
-                                    ui.input_textarea =
-                                        ratatui_textarea::TextArea::from(hist.lines());
+                            match ui.history_pos {
+                                None => {
+                                    let user_input = ui.input_textarea.lines().join("\n");
+                                    if !user_input.trim().is_empty() {
+                                        ui.input_history.insert(0, user_input);
+                                        ui.history_pos = Some(1);
+                                    }
+                                }
+                                Some(pos) => {
+                                    if pos < ui.input_history.len() {
+                                        ui.history_pos = Some(pos+1);
+                                        if let Some(hist) = ui.input_history.get(pos) {
+                                            ui.input_textarea = TextArea::from(hist.lines());
+                                        }
+                                    }
                                 }
                             }
                         }
                         KeyCode::Down => {
-                            if ui.history_pos > 0 {
-                                ui.history_pos -= 1;
-                                if let Some(hist) = ui.input_history.get(ui.history_pos) {
-                                    ui.input_textarea =
-                                        ratatui_textarea::TextArea::from(hist.lines());
+                            match ui.history_pos {
+                                Some(pos) if pos > 0 => {
+                                    ui.history_pos = Some(pos-1);
+                                    if let Some(hist) = ui.input_history.get(pos-1) {
+                                        ui.input_textarea = TextArea::from(hist.lines());
+                                    }
                                 }
-                            } else {
-                                ui.input_textarea.clear();
+                                _ => {
+                                    ui.input_history.insert(0, ui.input_textarea.lines().join("\n"));
+                                    ui.input_textarea.clear();
+                                    ui.history_pos = None;
+                                }
                             }
                         }
                         _ => {
