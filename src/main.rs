@@ -242,19 +242,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                         KeyCode::Down => {
                             match ui.history_pos {
-                                Some(pos) if pos > 0 => {
-                                    ui.history_pos = Some(pos-1);
-                                    if let Some(hist) = ui.input_history.get(pos-1) {
-                                        ui.input_textarea = TextArea::from(hist.lines());
-                                    }
-                                }
-                                _ => {
+                                None => {
                                     let user_input = ui.input_textarea.lines().join("\n");
                                     if !user_input.trim().is_empty() {
                                         ui.input_history.insert(0, ui.input_textarea.lines().join("\n"));
                                     }
                                     ui.input_textarea.clear();
                                     ui.history_pos = None;
+                                }
+                                Some(0) => {
+                                    ui.input_textarea.clear();
+                                    ui.history_pos = None;
+                                }
+                                Some(pos) => {
+                                    ui.history_pos = Some(pos-1);
+                                    if let Some(hist) = ui.input_history.get(pos-1) {
+                                        ui.input_textarea = TextArea::from(hist.lines());
+                                    }
                                 }
                             }
                         }
