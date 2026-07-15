@@ -64,9 +64,7 @@ impl<'a> LogosUI<'a> {
                 "Starting Logos: A Foundational Problem-Solving Architecture".to_string(),
                 "Welcome to the Logos system interface.".to_string(),
             ],
-            knowledge_base: vec![
-                "Loading knowledge entries...".to_string(),
-            ],
+            knowledge_base: vec!["Loading knowledge entries...".to_string()],
             planning_status: "Ready for new task".to_string(),
             system_state: "Operational".to_string(),
             input: "".to_string(),
@@ -340,7 +338,8 @@ impl<'a> LogosUI<'a> {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("▲"))
                 .end_symbol(Some("▼"));
-            let mut scrollbar_state = ScrollbarState::new(total_lines).position(self.planning_scroll);
+            let mut scrollbar_state =
+                ScrollbarState::new(total_lines).position(self.planning_scroll);
 
             frame.render_stateful_widget(
                 scrollbar,

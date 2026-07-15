@@ -1,6 +1,6 @@
 use serde::Deserialize;
-use std::fs;
 use std::error::Error;
+use std::fs;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -15,7 +15,8 @@ impl Config {
         let path = if let Ok(x_dg_config_home) = std::env::var("XDG_CONFIG_HOME") {
             std::path::PathBuf::from(x_dg_config_home).join("logos/config.toml")
         } else {
-            let mut p = std::path::PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
+            let mut p =
+                std::path::PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".to_string()));
             p.push(".config");
             p.push("logos");
             p.push("config.toml");

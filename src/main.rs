@@ -1,10 +1,10 @@
+mod config;
 mod kb;
 mod ui;
-mod config;
 
+use crate::config::Config;
 use crate::kb::{Tuple, KB};
 use crate::ui::{LogosUI, UIFocus};
-use crate::config::Config;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
@@ -252,8 +252,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     ui.cursor_pos = ui.input.len();
                                 }
                             KeyCode::Enter
-                                if !ui.input.is_empty() => {
-                                    let user_input = ui.input.clone();
+                                if !ui.input_textarea.text().is_empty() => {
+                                    let user_input = ui.input_textarea.text().clone();
                                     ui.messages.push(format!("You: {}", user_input));
                                     if ui.input_history.is_empty()
                                         || ui.input_history[0] != user_input
@@ -261,7 +261,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                         ui.input_history.insert(0, user_input.clone());
                                     }
                                     ui.history_pos = 0;
-                                    ui.input.clear();
+                                    ui.input_textarea.clear();
                                     ui.cursor_pos = 0;
                                     let tx = tx.clone();
                                     let model = config.model.clone();
@@ -313,7 +313,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                                         });
                                     });
                                 }
-                            _ => {}
+                                _ => {},
                         },
                         UIFocus::Chat => match key.code {
                             KeyCode::Up => {
