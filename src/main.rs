@@ -249,7 +249,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     }
                                 }
                                 _ => {
-                                    ui.input_history.insert(0, ui.input_textarea.lines().join("\n"));
+                                    let user_input = ui.input_textarea.lines().join("\n");
+                                    if !user_input.trim().is_empty() {
+                                        ui.input_history.insert(0, ui.input_textarea.lines().join("\n"));
+                                    }
                                     ui.input_textarea.clear();
                                     ui.history_pos = None;
                                 }
