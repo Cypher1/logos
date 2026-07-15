@@ -252,8 +252,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                                     ui.cursor_pos = ui.input.len();
                                 }
                             KeyCode::Enter
-                                if !ui.input_textarea.text().is_empty() => {
-                                    let user_input = ui.input_textarea.text().clone();
+                                if !ui.input_textarea.lines().is_empty() => {
+                                    let user_input = ui.input_textarea.lines().join("\n");
                                     ui.messages.push(format!("You: {}", user_input));
                                     if ui.input_history.is_empty()
                                         || ui.input_history[0] != user_input
