@@ -171,7 +171,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             let user_input = ui.input_textarea.lines().join("\n");
                             if !user_input.trim().is_empty() {
                                 ui.messages.push(format!("You: {}", user_input));
-                                if ui.input_history.is_empty() || ui.input_history[0] != user_input {
+                                if ui.input_history.is_empty() || ui.input_history[0] != user_input
+                                {
                                     ui.input_history.insert(0, user_input.clone());
                                 }
                                 ui.history_pos = 0;
@@ -182,9 +183,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 tokio::spawn(async move {
                                     let ollama = Ollama::default();
                                     let mut stream = match ollama
-                                        .generate_stream(GenerationRequest::new(
-                                            model, user_input,
-                                        ))
+                                        .generate_stream(GenerationRequest::new(model, user_input))
                                         .await
                                     {
                                         Ok(s) => s,
@@ -203,8 +202,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                     chunk.push_str(&response.response);
                                                 }
                                                 full_response.push_str(&chunk);
-                                                let _ =
-                                                    tx.send(Ok(OllamaMessage::Chunk(chunk)));
+                                                let _ = tx.send(Ok(OllamaMessage::Chunk(chunk)));
                                             }
                                             Err(e) => {
                                                 let _ = tx.send(Err(Box::new(e)));
@@ -219,6 +217,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         // Everything else (chars, backspace, arrow-key navigation,
                         // clipboard shortcuts, etc.) is delegated straight to the
                         // TextArea widget rather than hand-rolled per key.
+                        KeyCode::Up => {
+                            if ui.history_pos + 1 < ui.input_history.len() {
+                                ui.history_pos += 1;
+                                if let Some(hist) = ui.input_history.get(ui.history_pos) {
+                                    ui.input_textarea =
+                                        ratatui_textarea::TextArea::from(hist.lines());
+                                }
+                            }
+                        }
+                        KeyCode::Down => {
+                            if ui.history_pos > 0 {
+                                ui.history_pos -= 1;
+                                if let Some(hist) = ui.input_history.get(ui.history_pos) {
+                                    ui.input_textarea =
+                                        ratatui_textarea::TextArea::from(hist.lines());
+                                }
+                            } else {
+                                ui.input_textarea.clear();
+                            }
+                        }
                         _ => {
                             ui.input_textarea.input(event);
                         }
