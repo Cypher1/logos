@@ -93,7 +93,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
 
         // Handle input (both keyboard and mouse)
-        match event::read()? {
+        let event = event::read()?;
+        match event {
             Event::Mouse(mouse_event) => {
                 let col = mouse_event.column;
                 let row = mouse_event.row;
@@ -127,7 +128,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                         } else if contains(ui.planning_area) {
                             ui.planning_scroll = ui.planning_scroll.saturating_sub(1);
                         }
-                        ui.cursor_pos = ui.input.len();
                     }
                     event::MouseEventKind::ScrollDown => {
                         // Scroll down on whichever panel mouse is over
@@ -143,6 +143,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
             Event::Key(key) => {
+                if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
+                    break;
+                }
                 if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('z') {
                     // Suspend
                     disable_raw_mode().unwrap();
@@ -163,189 +166,105 @@ fn main() -> Result<(), Box<dyn Error>> {
                     terminal.clear()?;
                     continue;
                 }
-                match key.code {
-                    // Global keys
-                    KeyCode::Esc | KeyCode::Char('\u{4}') => break,
-                    KeyCode::Tab => {
-                        ui.focus = match ui.focus {
-                            UIFocus::Input => UIFocus::Chat,
-                            UIFocus::Chat => UIFocus::KB,
-                            UIFocus::KB => UIFocus::Planning,
-                            UIFocus::Planning => UIFocus::Input,
-                        };
-                    }
-                    KeyCode::BackTab => {
-                        ui.focus = match ui.focus {
-                            UIFocus::Input => UIFocus::Planning,
-                            UIFocus::Chat => UIFocus::Input,
-                            UIFocus::KB => UIFocus::Chat,
-                            UIFocus::Planning => UIFocus::KB,
-                        };
-                    }
-                    KeyCode::PageUp => match ui.focus {
-                        UIFocus::Input | UIFocus::Chat => {
-                            ui.chat_scroll = ui.chat_scroll.saturating_sub(5);
-                        }
-                        UIFocus::KB => {
-                            ui.kb_scroll = ui.kb_scroll.saturating_sub(5);
-                        }
-                        UIFocus::Planning => {
-                            ui.planning_scroll = ui.planning_scroll.saturating_sub(5);
-                        }
-                    },
-                    KeyCode::PageDown => match ui.focus {
-                        UIFocus::Input | UIFocus::Chat => {
-                            ui.chat_scroll = ui.chat_scroll.saturating_add(5);
-                        }
-                        UIFocus::KB => {
-                            ui.kb_scroll = ui.kb_scroll.saturating_add(5);
-                        }
-                        UIFocus::Planning => {
-                            ui.planning_scroll = ui.planning_scroll.saturating_add(5);
-                        }
-                    },
-                    // Focus-dependent keys
-                    _ => match ui.focus {
-                        UIFocus::Input => match key.code {
-                            KeyCode::Char(c) => {
-                                ui.input.insert(ui.cursor_pos, c);
-                                ui.cursor_pos += 1;
-                            }
-                            KeyCode::Backspace
-                                if ui.cursor_pos > 0 => {
-                                    ui.input.remove(ui.cursor_pos - 1);
-                                    ui.cursor_pos -= 1;
+                match ui.focus {
+                    UIFocus::Input => match key.code {
+                        KeyCode::Enter => {
+                            let user_input = ui.input_textarea.lines().join("\n");
+                            if !user_input.trim().is_empty() {
+                                ui.messages.push(format!("You: {}", user_input));
+                                if ui.input_history.is_empty() || ui.input_history[0] != user_input
+                                {
+                                    ui.input_history.insert(0, user_input.clone());
                                 }
-                            KeyCode::Left
-                                if ui.cursor_pos > 0 => {
-                                    ui.cursor_pos -= 1;
-                                }
-                            KeyCode::Right
-                                if ui.cursor_pos < ui.input.len() => {
-                                    ui.cursor_pos += 1;
-                                }
-                            KeyCode::Up
-                                // Navigate up in history
-                                if !ui.input_history.is_empty() => {
-                                    if ui.history_pos == 0 {
-                                        ui.input_history.insert(0, ui.input.clone());
-                                    }
-                                    if ui.history_pos < ui.input_history.len() {
-                                        ui.history_pos += 1;
-                                        ui.input = ui.input_history[ui.history_pos - 1].clone();
-                                        ui.cursor_pos = ui.input.len();
-                                    }
-                                }
-                            KeyCode::Down
-                                // Navigate down in history
-                                if ui.history_pos > 0 => {
-                                    ui.history_pos -= 1;
-                                    if ui.history_pos == 0 {
-                                        if !ui.input_history.is_empty() {
-                                            ui.input = ui.input_history.remove(0);
-                                        } else {
-                                            ui.input = String::new();
+                                ui.history_pos = 0;
+                                ui.input_textarea.clear();
+
+                                let tx = tx.clone();
+                                let model = config.model.clone();
+                                thread::spawn(move || {
+                                    let rt = match Runtime::new() {
+                                        Ok(rt) => rt,
+                                        Err(e) => {
+                                            let _ = tx.send(Err(Box::new(e)));
+                                            return;
                                         }
-                                    } else {
-                                        ui.input = ui.input_history[ui.history_pos - 1].clone();
-                                    }
-                                    ui.cursor_pos = ui.input.len();
-                                }
-                            KeyCode::Enter
-                                if !ui.input_textarea.lines().is_empty() => {
-                                    let user_input = ui.input_textarea.lines().join("\n");
-                                    ui.messages.push(format!("You: {}", user_input));
-                                    if ui.input_history.is_empty()
-                                        || ui.input_history[0] != user_input
-                                    {
-                                        ui.input_history.insert(0, user_input.clone());
-                                    }
-                                    ui.history_pos = 0;
-                                    ui.input_textarea.clear();
-                                    ui.cursor_pos = 0;
-                                    let tx = tx.clone();
-                                    let model = config.model.clone();
-                                    thread::spawn(move || {
-                                        let rt = match Runtime::new() {
-                                            Ok(rt) => rt,
+                                    };
+
+                                    rt.block_on(async move {
+                                        let ollama = Ollama::default();
+                                        let mut stream = match ollama
+                                            .generate_stream(GenerationRequest::new(
+                                                model, user_input,
+                                            ))
+                                            .await
+                                        {
+                                            Ok(s) => s,
                                             Err(e) => {
                                                 let _ = tx.send(Err(Box::new(e)));
                                                 return;
                                             }
                                         };
 
-                                        rt.block_on(async move {
-                                            let ollama = Ollama::default();
-                                            let mut stream = match ollama
-                                                .generate_stream(GenerationRequest::new(
-                                                    model,
-                                                    user_input,
-                                                ))
-                                                .await
-                                            {
-                                                Ok(s) => s,
+                                        let mut full_response = String::new();
+                                        while let Some(result) = stream.next().await {
+                                            match result {
+                                                Ok(responses) => {
+                                                    let mut chunk = String::new();
+                                                    for response in responses {
+                                                        chunk.push_str(&response.response);
+                                                    }
+                                                    full_response.push_str(&chunk);
+                                                    let _ =
+                                                        tx.send(Ok(OllamaMessage::Chunk(chunk)));
+                                                }
                                                 Err(e) => {
                                                     let _ = tx.send(Err(Box::new(e)));
                                                     return;
                                                 }
-                                            };
-
-                                            let mut full_response = String::new();
-                                            while let Some(result) = stream.next().await {
-                                                match result {
-                                                    Ok(responses) => {
-                                                        let mut chunk = String::new();
-                                                        for response in responses {
-                                                            chunk.push_str(&response.response);
-                                                        }
-                                                        full_response.push_str(&chunk);
-                                                        let _ = tx
-                                                            .send(Ok(OllamaMessage::Chunk(chunk)));
-                                                    }
-                                                    Err(e) => {
-                                                        let _ = tx.send(Err(Box::new(e)));
-                                                        return;
-                                                    }
-                                                }
                                             }
-                                            let _ =
-                                                tx.send(Ok(OllamaMessage::Final(full_response)));
-                                        });
+                                        }
+                                        let _ = tx.send(Ok(OllamaMessage::Final(full_response)));
                                     });
-                                }
-                                _ => {},
-                        },
-                        UIFocus::Chat => match key.code {
-                            KeyCode::Up => {
-                                ui.chat_scroll = ui.chat_scroll.saturating_sub(1);
+                                });
                             }
-                            KeyCode::Down => {
-                                ui.chat_scroll = ui.chat_scroll.saturating_add(1);
-                            }
-                            _ => {}
-                        },
-                        UIFocus::KB => match key.code {
-                            KeyCode::Up => {
-                                ui.kb_scroll = ui.kb_scroll.saturating_sub(1);
-                            }
-                            KeyCode::Down => {
-                                ui.kb_scroll = ui.kb_scroll.saturating_add(1);
-                            }
-                            KeyCode::Char('/') | KeyCode::Char('r') => {
-                                // Manual refresh key for KB
-                                update_kb_view(&mut ui, &kb)?;
-                            }
-                            _ => {}
-                        },
-                        UIFocus::Planning => match key.code {
-                            KeyCode::Up => {
-                                ui.planning_scroll = ui.planning_scroll.saturating_sub(1);
-                            }
-                            KeyCode::Down => {
-                                ui.planning_scroll = ui.planning_scroll.saturating_add(1);
-                            }
-                            _ => {}
-                        },
+                        }
+                        // Everything else (chars, backspace, arrow-key navigation,
+                        // clipboard shortcuts, etc.) is delegated straight to the
+                        // TextArea widget rather than hand-rolled per key.
+                        _ => {
+                            ui.input_textarea.input(event);
+                        }
+                    },
+                    UIFocus::Chat => match key.code {
+                        KeyCode::Up => {
+                            ui.chat_scroll = ui.chat_scroll.saturating_sub(1);
+                        }
+                        KeyCode::Down => {
+                            ui.chat_scroll = ui.chat_scroll.saturating_add(1);
+                        }
+                        _ => {}
+                    },
+                    UIFocus::KB => match key.code {
+                        KeyCode::Up => {
+                            ui.kb_scroll = ui.kb_scroll.saturating_sub(1);
+                        }
+                        KeyCode::Down => {
+                            ui.kb_scroll = ui.kb_scroll.saturating_add(1);
+                        }
+                        KeyCode::Char('/') | KeyCode::Char('r') => {
+                            // Manual refresh key for KB
+                            update_kb_view(&mut ui, &kb)?;
+                        }
+                        _ => {}
+                    },
+                    UIFocus::Planning => match key.code {
+                        KeyCode::Up => {
+                            ui.planning_scroll = ui.planning_scroll.saturating_sub(1);
+                        }
+                        KeyCode::Down => {
+                            ui.planning_scroll = ui.planning_scroll.saturating_add(1);
+                        }
+                        _ => {}
                     },
                 }
             }
