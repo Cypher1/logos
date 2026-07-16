@@ -1,6 +1,6 @@
 //! Integration tests for the knowledge base module.
 
-use crate::kb::{Tuple, KB};
+use crate::kb::{KB, Tuple};
 use std::error::Error;
 use std::result;
 

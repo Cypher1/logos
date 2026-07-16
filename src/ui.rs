@@ -2,11 +2,11 @@
 //! This module implements the ratatui-based terminal UI with multiple panels.
 
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
-    Frame,
 };
 
 /// UI Panel Focus Options

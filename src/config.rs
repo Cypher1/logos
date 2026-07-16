@@ -6,8 +6,11 @@ use std::fs;
 pub struct Config {
     pub model: String,
     pub temperature: f32,
-    pub max_tokens: usize,
-    pub enable_logging: bool,
+    pub max_tokens: i32,
+    pub top_p: f32,
+    pub top_k: u32,
+    pub repeat_penalty: f32,
+    pub stop: Vec<String>,
 }
 
 impl Config {
@@ -26,9 +29,16 @@ impl Config {
             // Default configuration if file is missing
             return Ok(Config {
                 model: "gpt-4o".to_string(),
-                temperature: 0.7,
-                max_tokens: 2048,
-                enable_logging: true,
+                temperature: 0.3,
+                max_tokens: 512,
+                top_p: 0.9,
+                top_k: 40,
+                repeat_penalty: 1.1,
+                stop: vec![
+                    "</think>".to_string(),
+                    "\n\nWait,".to_string(),
+                    "\n\nActually,".to_string(),
+                ],
             });
         }
         let content = fs::read_to_string(path)?;

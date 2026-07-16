@@ -3,21 +3,22 @@ mod kb;
 mod ui;
 
 use crate::config::Config;
-use crate::kb::{Tuple, KB};
+use crate::kb::{KB, Tuple};
 use crate::ui::{LogosUI, UIFocus};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ollama_rs::{
-    generation::chat::{
-        request::ChatMessageRequest, ChatMessage, ChatMessageResponse, ChatMessageResponseStream,
-    },
     Ollama,
+    generation::chat::{
+        ChatMessage, ChatMessageResponse, ChatMessageResponseStream, request::ChatMessageRequest,
+    },
+    models::ModelOptions,
 };
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
 use std::io::stdout;
@@ -180,6 +181,7 @@ async fn main() -> Result<()> {
                                     let prompt = ui.input_textarea.lines().join("\n");
 
                                     let history_ref = history.clone();
+                                    let stops = config.stop.clone();
                                     tokio::spawn(async move {
                                         let ollama = Ollama::default();
                                         // Switched to stream variant as per user request
@@ -189,6 +191,15 @@ async fn main() -> Result<()> {
                                                 ChatMessageRequest::new(
                                                     model,
                                                     vec![ChatMessage::user(prompt)],
+                                                )
+                                                .options(
+                                                    ModelOptions::default()
+                                                        .temperature(config.temperature)
+                                                        .num_predict(config.max_tokens)
+                                                        .top_p(config.top_p)
+                                                        .top_k(config.top_k)
+                                                        .repeat_penalty(config.repeat_penalty)
+                                                        .stop(stops),
                                                 ),
                                             )
                                             .await
