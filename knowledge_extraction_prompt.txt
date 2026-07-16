@@ -1,0 +1,21 @@
+Generate an array of JSON objects containing the following keys:
+- subject: the primary concept of the tuple
+- object: the secondary concept of the tuple
+- predicate: the relationship between the subject and object
+- confidence: how confident the relation is, as a float
+  - 0.00 -- impossible
+  - 0.05 -- very unlikely
+  - 0.25 -- unlikely
+  - 0.50 -- completely unknown
+  - 0.75 -- likely
+  - 0.95 -- very probable
+  - 1.00 -- self evident
+
+These objects should represent a set of RDF-style tuples expressing the following:
+
+"""
+{message}
+"""
+
+Output only valid JSON (no explanations outside JSON).
+JSON:
