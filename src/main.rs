@@ -10,15 +10,18 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use futures_util::StreamExt;
-use ollama_rs::generation::completion::request::GenerationRequest;
-use ollama_rs::Ollama;
+use ollama_rs::{
+    generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponseStream},
+    Ollama,
+};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
 use std::error::Error;
-use std::io::stdout;
 use std::sync::mpsc;
+use std::sync::{Arc, Mutex};
+use std::io::stdout;
+use tokio_stream::StreamExt;
 
 enum OllamaMessage {
     Chunk(String),
@@ -49,6 +52,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Channel for receiving Ollama responses
     let (tx, rx) = mpsc::channel::<Result<OllamaMessage, Box<dyn Error + Send + Sync>>>();
+
+    let history = Arc::new(Mutex::new(vec![]));
 
     // Main loop
     loop {
@@ -180,21 +185,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                                     let tx = tx.clone();
                                     let model = config.model.clone();
-                                    let chat_history: String = ui.messages.iter().map(|m| m.clone()).collect::<Vec<_>>().join("\n");
+                                    let prompt = ui.input_textarea.lines().join("\n");
+
+                                    let history_ref = history.clone();
                                     tokio::spawn(async move {
                                         let ollama = Ollama::default();
-                                        let mut stream = match ollama
-                                            .generate_stream(GenerationRequest::new(
-                                                model, chat_history,
-                                            ))
-                                            .await
-                                        {
-                                            Ok(s) => s,
-                                            Err(e) => {
-                                                let _ = tx.send(Err(Box::new(e)));
-                                                return;
-                                            }
-                                        };
+                                        // Switched to stream variant as per user request
+                                        let mut stream: ChatMessageResponseStream = match ollama
+                                                            .send_chat_messages_with_history_stream(
+                                                                history_ref,
+                                                                ChatMessageRequest::new(model, vec![ChatMessage::user(prompt)]),
+                                                            )
+                                                            .await
+                                                        {
+                                                            Ok(s) => s,
+                                                            Err(e) => {
+                                                                let _ = tx.send(Err(Box::new(e)));
+                                                                return;
+                                                            }
+                                                        };
 
                                         let mut full_response = String::new();
                                         while let Some(result) = stream.next().await {
