@@ -1,5 +1,5 @@
+use anyhow::Result;
 use serde::Deserialize;
-use std::error::Error;
 use std::fs;
 
 #[derive(Debug, Deserialize)]
@@ -11,7 +11,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Self, Box<dyn Error>> {
+    pub fn load() -> Result<Self> {
         let path = if let Ok(x_dg_config_home) = std::env::var("XDG_CONFIG_HOME") {
             std::path::PathBuf::from(x_dg_config_home).join("logos/config.toml")
         } else {

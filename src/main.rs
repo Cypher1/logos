@@ -5,31 +5,28 @@ mod ui;
 use crate::config::Config;
 use crate::kb::{Tuple, KB};
 use crate::ui::{LogosUI, UIFocus};
+use anyhow::{anyhow, Result};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ollama_rs::{
-    generation::chat::{request::ChatMessageRequest, ChatMessage, ChatMessageResponseStream},
+    generation::chat::{
+        request::ChatMessageRequest, ChatMessage, ChatMessageResponse, ChatMessageResponseStream,
+    },
     Ollama,
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
-use std::error::Error;
+use std::io::stdout;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
-use std::io::stdout;
 use tokio_stream::StreamExt;
 
-enum OllamaMessage {
-    Chunk(String),
-    Final(String),
-}
-
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     // Load configuration
     let config = Config::load()?;
     println!("Loaded config: {:?}", config);
@@ -51,7 +48,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut ui = LogosUI::new();
 
     // Channel for receiving Ollama responses
-    let (tx, rx) = mpsc::channel::<Result<OllamaMessage, Box<dyn Error + Send + Sync>>>();
+    let (tx, rx) = mpsc::channel::<Result<ChatMessageResponse>>();
 
     let history = Arc::new(Mutex::new(vec![]));
 
@@ -64,9 +61,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
         terminal.draw(|f| ui.render(f))?;
 
         // 1. Check for Ollama messages (non-blocking)
-        while let Ok(msg) = rx.try_recv() {
-            match msg {
-                Ok(OllamaMessage::Chunk(chunk)) => {
+        while let Ok(resp) = rx.try_recv() {
+            match resp {
+                Ok(ChatMessageResponse {
+                    message: ChatMessage { content: chunk, .. },
+                    ..
+                }) => {
+                    // TODO: Thinking
+                    // TODO: Images
+                    // TODO: Tool calls
                     if let Some(last_msg) = ui.messages.last_mut() {
                         if last_msg.starts_with("Ollama: ") {
                             last_msg.push_str(&chunk);
@@ -75,17 +78,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                     } else {
                         ui.messages.push(format!("Ollama: {}", chunk));
-                    }
-                }
-                Ok(OllamaMessage::Final(response)) => {
-                    if let Some(last_msg) = ui.messages.last_mut() {
-                        if last_msg.starts_with("Ollama: ") {
-                            *last_msg = format!("Ollama: {}", response);
-                        } else {
-                            ui.messages.push(format!("Ollama: {}", response));
-                        }
-                    } else {
-                        ui.messages.push(format!("Ollama: {}", response));
                     }
                 }
                 Err(e) => {
@@ -192,38 +184,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         let ollama = Ollama::default();
                                         // Switched to stream variant as per user request
                                         let mut stream: ChatMessageResponseStream = match ollama
-                                                            .send_chat_messages_with_history_stream(
-                                                                history_ref,
-                                                                ChatMessageRequest::new(model, vec![ChatMessage::user(prompt)]),
-                                                            )
-                                                            .await
-                                                        {
-                                                            Ok(s) => s,
-                                                            Err(e) => {
-                                                                let _ = tx.send(Err(Box::new(e)));
-                                                                return;
-                                                            }
-                                                        };
+                                            .send_chat_messages_with_history_stream(
+                                                history_ref,
+                                                ChatMessageRequest::new(
+                                                    model,
+                                                    vec![ChatMessage::user(prompt)],
+                                                ),
+                                            )
+                                            .await
+                                        {
+                                            Ok(s) => s,
+                                            Err(e) => {
+                                                let _ = tx.send(Err(anyhow!("{}", e)));
+                                                return;
+                                            }
+                                        };
 
-                                        let mut full_response = String::new();
                                         while let Some(result) = stream.next().await {
-                                            match result {
-                                                Ok(responses) => {
-                                                    let mut chunk = String::new();
-                                                    for response in responses {
-                                                        chunk.push_str(&response.response);
-                                                    }
-                                                    full_response.push_str(&chunk);
-                                                    let _ =
-                                                        tx.send(Ok(OllamaMessage::Chunk(chunk)));
-                                                }
-                                                Err(e) => {
-                                                    let _ = tx.send(Err(Box::new(e)));
-                                                    return;
-                                                }
+                                            if let Ok(result) = result {
+                                                let _ = tx.send(Ok(result));
                                             }
                                         }
-                                        let _ = tx.send(Ok(OllamaMessage::Final(full_response)));
                                     });
                                 }
                             }
@@ -329,7 +310,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Updates the UI's knowledge base view from the KB
-fn update_kb_view(ui: &mut LogosUI, kb: &KB) -> Result<(), Box<dyn Error>> {
+fn update_kb_view(ui: &mut LogosUI, kb: &KB) -> Result<()> {
     // Clear the current knowledge base display
     ui.knowledge_base.clear();
     let mut count = 0;
