@@ -1,0 +1,53 @@
+name: logos
+
+on: [push]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  logos:
+    name: logos CI ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest] #, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/cache@v3
+      with:
+        path: |
+          /home/runner/.cargo/
+          target
+        key: ${{ runner.os }}-logos-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-logos-cargo-${{ hashFiles('**/Cargo.lock') }}
+          ${{ runner.os }}-logos-cargo-
+          ${{ runner.os }}-
+    - name: Run tests
+      run: cargo test --locked --release --verbose
+    - name: Run ignored tests
+      run: cargo test --locked --release --verbose -- --ignored
+    - name: Build
+      run: cargo build --locked --release --verbose
+    - name: Upload executable Linux
+      if: runner.os == 'Linux'
+      uses: actions/upload-artifact@v4
+      with:
+        name: logos
+        path: ./target/release/logos
+    - name: Upload executable Windows
+      if: runner.os == 'Windows'
+      uses: actions/upload-artifact@v4
+      with:
+        name: logos.exe
+        path: ./target/release/logos.exe
+    - name: Install clippy
+      run: rustup component add clippy
+    - name: Clippy logos
+      run: cargo clippy --all-features -- -D warnings
+    - name: Install fmt
+      run: rustup component add rustfmt
+    - name: Format
+      run: cargo fmt --all -- --check
