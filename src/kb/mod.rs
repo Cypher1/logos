@@ -65,6 +65,7 @@ impl KB {
     }
 
     /// Retrieves a tuple from the knowledge base by its key.
+    #[allow(dead_code)]
     pub fn retrieve_tuple(
         &self,
         subject: impl Into<Ent>,
