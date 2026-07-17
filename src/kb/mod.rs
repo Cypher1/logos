@@ -2,21 +2,25 @@
 //!
 //! This module provides the core data structures and functionality for
 //! storing and retrieving knowledge base tuples using redb.
-
+//!
 #[cfg(test)]
 mod tests;
 pub mod tuple;
 
 pub use tuple::Ent;
-pub use tuple::Tuple;
+pub use tuple::{Tuple, TupleID};
 
 use anyhow::Result;
-use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition, MultimapTableDefinition};
+use redb::{Database, MultimapTableDefinition, ReadableDatabase, ReadableTable, TableDefinition};
+use std::collections::HashSet;
 
 const TUPLES_TABLE: TableDefinition<u64, &[u8]> = TableDefinition::new("tuples");
-const PREDICATE_TABLE: MultimapTableDefinition<&str, u64> = MultimapTableDefinition::new("tuples_by_predicate");
-const SUBJECT_TABLE: MultimapTableDefinition<&str, u64> = MultimapTableDefinition::new("tuples_by_subject");
-const OBJECT_TABLE: MultimapTableDefinition<&str, u64> = MultimapTableDefinition::new("tuples_by_object");
+const PREDICATE_TABLE: MultimapTableDefinition<&str, u64> =
+    MultimapTableDefinition::new("tuples_by_predicate");
+const SUBJECT_TABLE: MultimapTableDefinition<&str, u64> =
+    MultimapTableDefinition::new("tuples_by_subject");
+const OBJECT_TABLE: MultimapTableDefinition<&str, u64> =
+    MultimapTableDefinition::new("tuples_by_object");
 
 /// A simple wrapper around redb's database to manage tuples.
 pub struct KB {
@@ -67,24 +71,31 @@ impl KB {
         Ok(())
     }
 
-    /// Retrieves a tuple from the knowledge base by its key.
-    #[allow(dead_code)]
+    /// Retrieves a tuple from the knowledge base by its ID.
+    pub fn retrieve_by_id(&self, id: TupleID) -> Result<Option<Tuple>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(TUPLES_TABLE)?;
+        if let Some(row) = table.get(&id)? {
+            let tuple: Tuple = serde_json::from_slice(row.value())?;
+            return Ok(Some(tuple));
+        }
+
+        Ok(None)
+    }
+
+    /// Retrieves a tuple from the knowledge base by its key (subject, predicate, object).
     pub fn retrieve_tuple(
         &self,
         subject: impl Into<Ent>,
         predicate: impl Into<Ent>,
         object: impl Into<Ent>,
-    ) -> Result<Option<Tuple>> {
+    ) -> Result<Tuple> {
         let tuple = Tuple::new(subject.into(), predicate.into(), object.into(), 0.5);
-        let id = tuple.id();
-        let read_txn = self.db.begin_read()?;
-        let table = read_txn.open_table(TUPLES_TABLE)?;
-        if let Some(guard) = table.get(&id)? {
-            let tuple: Tuple = serde_json::from_slice(guard.value())?;
-            return Ok(Some(tuple));
-        }
-
-        Ok(None)
+        let tuple = match self.retrieve_by_id(tuple.id())? {
+            Some(tuple) => tuple,
+            None => tuple,
+        };
+        Ok(tuple)
     }
 
     /// Retrieves all tuples from the knowledge base.
@@ -93,13 +104,55 @@ impl KB {
         let table = read_txn.open_table(TUPLES_TABLE)?;
         let mut tuples = Vec::new();
 
-        let iter = table.iter()?;
-        for res in iter {
-            let (_key_guard, val_guard) = res?;
-            let tuple: Tuple = serde_json::from_slice(val_guard.value())?;
+        let cursor = table.iter()?;
+        for row in cursor {
+            let (_key, val) = row?;
+            let tuple: Tuple = serde_json::from_slice(val.value())?;
             tuples.push(tuple);
         }
 
         Ok(tuples)
+    }
+
+    /// Retrieves all tuples with a specific subject.
+    pub fn retrieve_by_subject(&self, subject: impl Into<Ent>) -> Result<HashSet<TupleID>> {
+        let read_txn = self.db.begin_read()?;
+        let sub_table = read_txn.open_multimap_table(SUBJECT_TABLE)?;
+        let mut results = HashSet::new();
+
+        for row in sub_table.get(format!("sub::{}", subject.into()).as_str())? {
+            let tuple: TupleID = row?.value();
+            results.insert(tuple);
+        }
+
+        Ok(results)
+    }
+
+    /// Retrieves all tuples with a specific predicate.
+    pub fn retrieve_by_predicate(&self, predicate: impl Into<Ent>) -> Result<HashSet<TupleID>> {
+        let read_txn = self.db.begin_read()?;
+        let pred_table = read_txn.open_multimap_table(PREDICATE_TABLE)?;
+        let mut results = HashSet::new();
+
+        for row in pred_table.get(format!("pred::{}", predicate.into()).as_str())? {
+            let tuple: TupleID = row?.value();
+            results.insert(tuple);
+        }
+
+        Ok(results)
+    }
+
+    /// Retrieves all tuples with a specific object.
+    pub fn retrieve_by_object(&self, object: impl Into<Ent>) -> Result<HashSet<TupleID>> {
+        let read_txn = self.db.begin_read()?;
+        let obj_table = read_txn.open_multimap_table(OBJECT_TABLE)?;
+        let mut results = HashSet::new();
+
+        for row in obj_table.get(format!("obj::{}", object.into()).as_str())? {
+            let tuple: TupleID = row?.value();
+            results.insert(tuple);
+        }
+
+        Ok(results)
     }
 }

@@ -2,13 +2,15 @@
 
 use serde::{Deserialize, Serialize};
 
+pub type TupleID = u64;
+
 /// An entity in the storage system
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Hash)]
 pub enum Ent {
     /// A concept/idea.
     Entity(u64),
     /// A statement / condition.
-    Tuple(u64),
+    Tuple(TupleID),
     /// A raw string (for names etc.).
     Str(String),
     /// A raw int 64(for counting etc.).
@@ -27,10 +29,12 @@ impl std::fmt::Display for Ent {
         match self {
             Entity(e) => write!(f, "Entity{e}"),
             Tuple(t) => write!(f, "Tuple{t}"),
-            Str(s) => if s.chars().any(|c| c.is_digit(10) || c == ' ' || c == '\'') {
-                write!(f, "'{s}'")
-            } else {
-                write!(f, "s")
+            Str(s) => {
+                if s.chars().any(|c| c.is_digit(10) || c == ' ' || c == '\'') {
+                    write!(f, "'{s}'")
+                } else {
+                    write!(f, "{s}")
+                }
             }
             I64(i) => write!(f, "{i}"),
         }
@@ -75,7 +79,7 @@ impl Tuple {
     }
 
     /// Calculates an ID from the hash.
-    pub fn id(&self) -> u64 {
+    pub fn id(&self) -> TupleID {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
@@ -112,6 +116,6 @@ mod tests {
         assert_eq!(tuple.object, "Bob".into());
         assert!(tuple.confidence > 0.8999);
         assert!(tuple.confidence < 0.9001);
-        assert_eq!(format!("{}", tuple), "'Alice' 'knows' 'Bob' (0.90)");
+        assert_eq!(format!("{}", tuple), "Alice knows Bob: 0.90");
     }
 }

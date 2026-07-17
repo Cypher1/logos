@@ -6,6 +6,7 @@
 use crate::kb::{KB, Tuple};
 use std::error::Error;
 use std::fs;
+use pretty_assertions::assert_eq;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -32,11 +33,11 @@ fn test_kb_tuple_storage_and_indexes() -> Result<()> {
 
     // 1. Verify main storage retrieval
     let retrieved = kb.retrieve_tuple("Alice", "knows", "Bob")?;
-    assert!(retrieved.is_some());
-    let r = retrieved.unwrap();
+    let r = retrieved;
     assert_eq!(r.subject, "Alice".into());
     assert_eq!(r.predicate, "knows".into());
     assert_eq!(r.object, "Bob".into());
+    assert!(r.confidence > 0.8999 && r.confidence < 0.9001);
 
     // 2. Verify all_tuples retrieval
     let all = kb.get_all_tuples()?;
@@ -52,7 +53,7 @@ fn test_kb_tuple_storage_and_indexes() -> Result<()> {
 
     // Test non-existent
     let missing = kb.retrieve_tuple("Unknown", "does", "Nothing")?;
-    assert!(missing.is_none());
+    assert!(missing.confidence > 0.4999 && missing.confidence < 0.5001, "Confidence {conf}", conf=missing.confidence);
 
     teardown_db(&path);
     Ok(())
