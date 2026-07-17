@@ -4,9 +4,9 @@
 //! checking both main storage and all secondary indexes (predicate, subject, object).
 
 use crate::kb::{KB, Tuple};
+use pretty_assertions::assert_eq;
 use std::error::Error;
 use std::fs;
-use pretty_assertions::assert_eq;
 
 pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -53,7 +53,11 @@ fn test_kb_tuple_storage_and_indexes() -> Result<()> {
 
     // Test non-existent
     let missing = kb.retrieve_tuple("Unknown", "does", "Nothing")?;
-    assert!(missing.confidence > 0.4999 && missing.confidence < 0.5001, "Confidence {conf}", conf=missing.confidence);
+    assert!(
+        missing.confidence > 0.4999 && missing.confidence < 0.5001,
+        "Confidence {conf}",
+        conf = missing.confidence
+    );
 
     teardown_db(&path);
     Ok(())
@@ -79,7 +83,7 @@ fn test_retrieve_by_subject() -> Result<()> {
     kb.store_tuple(&tuple2)?;
     kb.store_tuple(&tuple3)?;
 
-    let mut results = kb.retrieve_by_subject("Alice")?;
+    let results = kb.retrieve_by_subject("Alice")?;
     assert_eq!(results.len(), 2);
     assert!(results.contains(&tuple1.id()));
     assert!(results.contains(&tuple2.id()));
@@ -99,7 +103,7 @@ fn test_retrieve_by_predicate() -> Result<()> {
     kb.store_tuple(&tuple2)?;
     kb.store_tuple(&tuple3)?;
 
-    let mut results = kb.retrieve_by_predicate("knows")?;
+    let results = kb.retrieve_by_predicate("knows")?;
     assert_eq!(results.len(), 2);
     assert!(results.contains(&tuple1.id()));
     assert!(results.contains(&tuple2.id()));
@@ -119,12 +123,26 @@ fn test_retrieve_by_object() -> Result<()> {
     kb.store_tuple(&tuple2)?;
     kb.store_tuple(&tuple3)?;
 
-    let mut results = kb.retrieve_by_object("Bob")?;
+    let results = kb.retrieve_by_object("Bob")?;
     assert_eq!(results.len(), 2);
     assert!(results.contains(&tuple1.id()));
     assert!(results.contains(&tuple2.id()));
     assert!(!results.contains(&tuple3.id()));
 
+    teardown_db(&path);
+    Ok(())
+}
+
+#[test]
+fn test_store_tuples_batch() -> Result<()> {
+    let (kb, path) = setup_kb("batch")?;
+    let tuples = vec![
+        Tuple::new("Alice", "knows", "Bob", 0.9),
+        Tuple::new("Charlie", "likes", "Dave", 0.8),
+    ];
+    kb.store_tuples(&tuples)?;
+    let all = kb.get_all_tuples()?;
+    assert_eq!(all.len(), 2);
     teardown_db(&path);
     Ok(())
 }

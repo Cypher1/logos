@@ -47,25 +47,27 @@ impl KB {
 
     /// Inserts a tuple into the knowledge base.
     pub fn store_tuple(&self, tuple: &Tuple) -> Result<()> {
-        let id = tuple.id();
-        let value = serde_json::to_vec(tuple)?;
+        self.store_tuples([tuple])
+    }
 
+    /// Inserts multiple tuples into the knowledge base in a single transaction.
+    pub fn store_tuples<'a>(&self, tuples: impl IntoIterator<Item=&'a Tuple>) -> Result<()> {
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TUPLES_TABLE)?;
-            table.insert(id, value.as_slice())?;
-
-            // Index by predicate
             let mut pred_table = write_txn.open_multimap_table(PREDICATE_TABLE)?;
-            pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), &id)?;
-
-            // Index by subject
             let mut sub_table = write_txn.open_multimap_table(SUBJECT_TABLE)?;
-            sub_table.insert(format!("sub::{}", tuple.subject).as_str(), &id)?;
-
-            // Index by object
             let mut obj_table = write_txn.open_multimap_table(OBJECT_TABLE)?;
-            obj_table.insert(format!("obj::{}", tuple.object).as_str(), &id)?;
+
+            for tuple in tuples {
+                let id = tuple.id();
+                let value = serde_json::to_vec(tuple)?;
+
+                table.insert(id, value.as_slice())?;
+                pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), &id)?;
+                sub_table.insert(format!("sub::{}", tuple.subject).as_str(), &id)?;
+                obj_table.insert(format!("obj::{}", tuple.object).as_str(), &id)?;
+            }
         }
         write_txn.commit()?;
         Ok(())
@@ -153,6 +155,21 @@ impl KB {
             results.insert(tuple);
         }
 
+        Ok(results)
+    }
+
+    /// Retrieves multiple tuples from the knowledge base by their IDs.
+    pub fn retrieve_multiple_by_ids<'a>(&self, ids: impl IntoIterator<Item=&'a TupleID>) -> Result<Vec<Tuple>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(TUPLES_TABLE)?;
+        let mut results = Vec::new();
+
+        for id in ids {
+            if let Some(row) = table.get(id)? {
+                let tuple: Tuple = serde_json::from_slice(row.value())?;
+                results.push(tuple);
+            }
+        }
         Ok(results)
     }
 }
