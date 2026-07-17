@@ -11,12 +11,12 @@ pub use tuple::Ent;
 pub use tuple::Tuple;
 
 use anyhow::Result;
-use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition};
+use redb::{Database, ReadableDatabase, ReadableTable, TableDefinition, MultimapTableDefinition};
 
 const TUPLES_TABLE: TableDefinition<u64, &[u8]> = TableDefinition::new("tuples");
-const PREDICATE_TABLE: TableDefinition<&str, u64> = TableDefinition::new("tuples_by_predicate");
-const SUBJECT_TABLE: TableDefinition<&str, u64> = TableDefinition::new("tuples_by_subject");
-const OBJECT_TABLE: TableDefinition<&str, u64> = TableDefinition::new("tuples_by_object");
+const PREDICATE_TABLE: MultimapTableDefinition<&str, u64> = MultimapTableDefinition::new("tuples_by_predicate");
+const SUBJECT_TABLE: MultimapTableDefinition<&str, u64> = MultimapTableDefinition::new("tuples_by_subject");
+const OBJECT_TABLE: MultimapTableDefinition<&str, u64> = MultimapTableDefinition::new("tuples_by_object");
 
 /// A simple wrapper around redb's database to manage tuples.
 pub struct KB {
@@ -32,6 +32,9 @@ impl KB {
         let write_txn = db.begin_write()?;
         {
             let _table = write_txn.open_table(TUPLES_TABLE)?;
+            let _pred_table = write_txn.open_multimap_table(PREDICATE_TABLE)?;
+            let _sub_table = write_txn.open_multimap_table(SUBJECT_TABLE)?;
+            let _obj_table = write_txn.open_multimap_table(OBJECT_TABLE)?;
         }
         write_txn.commit()?;
 
@@ -49,15 +52,15 @@ impl KB {
             table.insert(id, value.as_slice())?;
 
             // Index by predicate
-            let mut pred_table = write_txn.open_table(PREDICATE_TABLE)?;
+            let mut pred_table = write_txn.open_multimap_table(PREDICATE_TABLE)?;
             pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), &id)?;
 
             // Index by subject
-            let mut sub_table = write_txn.open_table(SUBJECT_TABLE)?;
+            let mut sub_table = write_txn.open_multimap_table(SUBJECT_TABLE)?;
             sub_table.insert(format!("sub::{}", tuple.subject).as_str(), &id)?;
 
             // Index by object
-            let mut obj_table = write_txn.open_table(OBJECT_TABLE)?;
+            let mut obj_table = write_txn.open_multimap_table(OBJECT_TABLE)?;
             obj_table.insert(format!("obj::{}", tuple.object).as_str(), &id)?;
         }
         write_txn.commit()?;
