@@ -27,7 +27,11 @@ impl std::fmt::Display for Ent {
         match self {
             Entity(e) => write!(f, "Entity{e}"),
             Tuple(t) => write!(f, "Tuple{t}"),
-            Str(s) => write!(f, "'{s}'"),
+            Str(s) => if s.chars().any(|c| c.is_digit(10) || c == ' ' || c == '\'') {
+                write!(f, "'{s}'")
+            } else {
+                write!(f, "s")
+            }
             I64(i) => write!(f, "{i}"),
         }
     }
@@ -86,11 +90,11 @@ impl Tuple {
 impl std::fmt::Display for Tuple {
     /// Converts the tuple to a human-readable string representation.
     ///
-    /// The format is: "subject predicate object (confidence)"
+    /// The format is: "subject predicate object: confidence"
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} {} {} ({:.2})",
+            "{} {} {}: {:.2}",
             self.subject, self.predicate, self.object, self.confidence
         )
     }
