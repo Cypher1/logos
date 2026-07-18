@@ -100,20 +100,12 @@ impl KB {
         Ok(tuple)
     }
 
-    /// Retrieves all tuples from the knowledge base.
-    pub fn get_all_tuples(&self) -> Result<Vec<Tuple>> {
-        let mut tuples = Vec::new();
-        self.for_each_tuple(|tuple| {
-            tuples.push(tuple);
-        })?;
-        Ok(tuples)
-    }
-
     /// Streams all tuples from the knowledge base, executing a closure for each.
-    pub fn for_each_tuple<F>(&self, mut f: F) -> Result<()>
+    pub fn for_each_tuple<F>(&self, mut f: F) -> Result<usize>
     where
         F: FnMut(Tuple),
     {
+        let mut count = 0;
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
 
@@ -121,9 +113,10 @@ impl KB {
             let (_key, val) = row?;
             let tuple: Tuple = serde_json::from_slice(val.value())?;
             f(tuple);
+            count += 1;
         }
 
-        Ok(())
+        Ok(count)
     }
 
     /// Retrieves all tuples with a specific subject.
@@ -161,7 +154,10 @@ impl KB {
     }
 
     /// Retrieves multiple tuples from the knowledge base by their IDs.
-    pub fn retrieve_multiple_by_ids<'a>(&self, ids: impl IntoIterator<Item = &'a TupleID>) -> Result<Vec<Tuple>> {
+    pub fn retrieve_multiple_by_ids<'a>(
+        &self,
+        ids: impl IntoIterator<Item = &'a TupleID>,
+    ) -> Result<Vec<Tuple>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
         let mut results = Vec::new();

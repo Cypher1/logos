@@ -64,10 +64,7 @@ async fn main() -> Result<()> {
         // 1. Check for Ollama messages (non-blocking)
         while let Ok(resp) = rx.try_recv() {
             match resp {
-                Ok(ChatMessageResponse {
-                    done: true,
-                    ..
-                }) => {}
+                Ok(ChatMessageResponse { done: true, .. }) => {}
                 Ok(ChatMessageResponse {
                     message: ChatMessage { content: chunk, .. },
                     done: false,
@@ -329,11 +326,10 @@ fn update_kb_view(ui: &mut LogosUI, kb: &KB) -> Result<()> {
     // Clear the current knowledge base display
     ui.knowledge_base.clear();
     let mut count = 0;
-    let tuples = kb.get_all_tuples()?;
-    for tuple in tuples {
+    kb.for_each_tuple(|tuple| {
         ui.knowledge_base.push(tuple.to_string());
         count += 1;
-    }
+    })?;
     ui.system_state = format!("Loaded {} tuples from KB", count);
     Ok(())
 }

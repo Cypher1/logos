@@ -40,16 +40,17 @@ fn test_kb_tuple_storage_and_indexes() -> Result<()> {
     assert!(r.confidence > 0.8999 && r.confidence < 0.9001);
 
     // 2. Verify all_tuples retrieval
-    let all = kb.get_all_tuples()?;
-    assert_eq!(all.len(), 1);
-    assert_eq!(all[0].subject, "Alice".into());
+    let count = kb.for_each_tuple(|tuple| {
+        assert_eq!(tuple.subject, "Alice".into());
+    })?;
+    assert_eq!(count, 1);
 
     // 3. Multiple entries & index integrity check (sequential stores)
     kb.store_tuple(&Tuple::new("Charlie", "likes", "Dave", 0.8))?;
     kb.store_tuple(&Tuple::new("Eve", "owns", "Treasure", 1.0))?;
 
-    let all_many = kb.get_all_tuples()?;
-    assert_eq!(all_many.len(), 3);
+    let count = kb.for_each_tuple(|_| {})?;
+    assert_eq!(count, 3);
 
     // Test non-existent
     let missing = kb.retrieve_tuple("Unknown", "does", "Nothing")?;
@@ -64,10 +65,11 @@ fn test_kb_tuple_storage_and_indexes() -> Result<()> {
 }
 
 #[test]
-fn test_get_all_tuples_empty() -> Result<()> {
+fn test_kb_empty() -> Result<()> {
     let (kb, path) = setup_kb("empty")?;
-    let tuples = kb.get_all_tuples()?;
-    assert!(tuples.is_empty());
+
+    let count = kb.for_each_tuple(|_| {})?;
+    assert_eq!(count, 0);
 
     teardown_db(&path);
     Ok(())
@@ -141,8 +143,14 @@ fn test_store_tuples_batch() -> Result<()> {
         Tuple::new("Charlie", "likes", "Dave", 0.8),
     ];
     kb.store_tuples(&tuples)?;
-    let all = kb.get_all_tuples()?;
-    assert_eq!(all.len(), 2);
+
+    let mut all = vec![];
+    kb.for_each_tuple(|tuple| {
+        all.push(tuple);
+    })?;
+    all.sort();
+    assert_eq!(all, tuples);
+
     teardown_db(&path);
     Ok(())
 }
