@@ -29,7 +29,7 @@ impl Config {
             // Default configuration if file is missing
             return Ok(Config {
                 model: "gpt-4o".to_string(),
-                temperature: 0.3,
+                temperature: 1.0,
                 max_tokens: 512,
                 top_p: 0.9,
                 top_k: 40,

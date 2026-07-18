@@ -65,7 +65,12 @@ async fn main() -> Result<()> {
         while let Ok(resp) = rx.try_recv() {
             match resp {
                 Ok(ChatMessageResponse {
+                    done: true,
+                    ..
+                }) => {}
+                Ok(ChatMessageResponse {
                     message: ChatMessage { content: chunk, .. },
+                    done: false,
                     ..
                 }) => {
                     // TODO: Thinking
@@ -178,7 +183,6 @@ async fn main() -> Result<()> {
 
                                     let tx = tx.clone();
                                     let model = config.model.clone();
-                                    let prompt = ui.input_textarea.lines().join("\n");
 
                                     let history_ref = history.clone();
                                     let stops = config.stop.clone();
@@ -190,7 +194,7 @@ async fn main() -> Result<()> {
                                                 history_ref,
                                                 ChatMessageRequest::new(
                                                     model,
-                                                    vec![ChatMessage::user(prompt)],
+                                                    vec![ChatMessage::user(user_input)],
                                                 )
                                                 .options(
                                                     ModelOptions::default()
