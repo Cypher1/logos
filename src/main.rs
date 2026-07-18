@@ -267,11 +267,17 @@ async fn main() -> Result<()> {
                                     }
                                 }
                             },
+                            KeyCode::Tab => {
+                                ui.focus = UIFocus::Chat;
+                            }
                             _ => {
                                 ui.input_textarea.input(event);
                             }
                         },
                         UIFocus::Chat => match key.code {
+                            KeyCode::Tab => {
+                                ui.focus = UIFocus::KB;
+                            }
                             KeyCode::Up => {
                                 ui.chat_scroll = ui.chat_scroll.saturating_sub(1);
                             }
@@ -281,6 +287,9 @@ async fn main() -> Result<()> {
                             _ => {}
                         },
                         UIFocus::KB => match key.code {
+                            KeyCode::Tab => {
+                                ui.focus = UIFocus::Planning;
+                            }
                             KeyCode::Up => {
                                 ui.kb_scroll = ui.kb_scroll.saturating_sub(1);
                             }
@@ -294,6 +303,9 @@ async fn main() -> Result<()> {
                             _ => {}
                         },
                         UIFocus::Planning => match key.code {
+                            KeyCode::Tab => {
+                                ui.focus = UIFocus::Input;
+                            }
                             KeyCode::Up => {
                                 ui.planning_scroll = ui.planning_scroll.saturating_sub(1);
                             }
