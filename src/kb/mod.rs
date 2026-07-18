@@ -51,7 +51,7 @@ impl KB {
     }
 
     /// Inserts multiple tuples into the knowledge base in a single transaction.
-    pub fn store_tuples<'a>(&self, tuples: impl IntoIterator<Item=&'a Tuple>) -> Result<()> {
+    pub fn store_tuples<'a>(&self, tuples: impl IntoIterator<Item = &'a Tuple>) -> Result<()> {
         let write_txn = self.db.begin_write()?;
         {
             let mut table = write_txn.open_table(TUPLES_TABLE)?;
@@ -102,55 +102,57 @@ impl KB {
 
     /// Retrieves all tuples from the knowledge base.
     pub fn get_all_tuples(&self) -> Result<Vec<Tuple>> {
+        let mut tuples = Vec::new();
+        self.for_each_tuple(|tuple| {
+            tuples.push(tuple);
+        })?;
+        Ok(tuples)
+    }
+
+    /// Streams all tuples from the knowledge base, executing a closure for each.
+    pub fn for_each_tuple<F>(&self, mut f: F) -> Result<()>
+    where
+        F: FnMut(Tuple),
+    {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
-        let mut tuples = Vec::new();
 
-        let cursor = table.iter()?;
-        for row in cursor {
+        for row in table.iter()? {
             let (_key, val) = row?;
             let tuple: Tuple = serde_json::from_slice(val.value())?;
-            tuples.push(tuple);
+            f(tuple);
         }
 
-        Ok(tuples)
+        Ok(())
     }
 
     /// Retrieves all tuples with a specific subject.
     pub fn retrieve_by_subject(&self, subject: impl Into<Ent>) -> Result<HashSet<TupleID>> {
-        let read_txn = self.db.begin_read()?;
-        let sub_table = read_txn.open_multimap_table(SUBJECT_TABLE)?;
-        let mut results = HashSet::new();
-
-        for row in sub_table.get(format!("sub::{}", subject.into()).as_str())? {
-            let tuple: TupleID = row?.value();
-            results.insert(tuple);
-        }
-
-        Ok(results)
+        self.retrieve_by_index(SUBJECT_TABLE, "sub", subject.into())
     }
 
     /// Retrieves all tuples with a specific predicate.
     pub fn retrieve_by_predicate(&self, predicate: impl Into<Ent>) -> Result<HashSet<TupleID>> {
-        let read_txn = self.db.begin_read()?;
-        let pred_table = read_txn.open_multimap_table(PREDICATE_TABLE)?;
-        let mut results = HashSet::new();
-
-        for row in pred_table.get(format!("pred::{}", predicate.into()).as_str())? {
-            let tuple: TupleID = row?.value();
-            results.insert(tuple);
-        }
-
-        Ok(results)
+        self.retrieve_by_index(PREDICATE_TABLE, "pred", predicate.into())
     }
 
     /// Retrieves all tuples with a specific object.
     pub fn retrieve_by_object(&self, object: impl Into<Ent>) -> Result<HashSet<TupleID>> {
+        self.retrieve_by_index(OBJECT_TABLE, "obj", object.into())
+    }
+
+    /// Helper to retrieve Tuples by an index key (subject/predicate/object).
+    fn retrieve_by_index(
+        &self,
+        table_def: MultimapTableDefinition<&str, u64>,
+        prefix: &str,
+        entity: Ent,
+    ) -> Result<HashSet<TupleID>> {
         let read_txn = self.db.begin_read()?;
-        let obj_table = read_txn.open_multimap_table(OBJECT_TABLE)?;
+        let table = read_txn.open_multimap_table(table_def)?;
         let mut results = HashSet::new();
 
-        for row in obj_table.get(format!("obj::{}", object.into()).as_str())? {
+        for row in table.get(format!("{}::{}", prefix, entity).as_str())? {
             let tuple: TupleID = row?.value();
             results.insert(tuple);
         }
@@ -159,7 +161,7 @@ impl KB {
     }
 
     /// Retrieves multiple tuples from the knowledge base by their IDs.
-    pub fn retrieve_multiple_by_ids<'a>(&self, ids: impl IntoIterator<Item=&'a TupleID>) -> Result<Vec<Tuple>> {
+    pub fn retrieve_multiple_by_ids<'a>(&self, ids: impl IntoIterator<Item = &'a TupleID>) -> Result<Vec<Tuple>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
         let mut results = Vec::new();
