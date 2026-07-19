@@ -1,3 +1,4 @@
+mod commands;
 mod config;
 mod kb;
 mod ui;
@@ -40,6 +41,7 @@ struct App<'a, B: Backend> {
     tx: mpsc::Sender<Result<ChatMessageResponse>>,
     rx: mpsc::Receiver<Result<ChatMessageResponse>>,
     history: Arc<Mutex<Vec<ChatMessage>>>,
+    registry: commands::CommandRegistry,
 }
 
 impl<'a, B: Backend + Write> App<'a, B>
@@ -57,6 +59,7 @@ where
             tx,
             rx,
             history,
+            registry: commands::get_default_registry(),
         }
     }
 
