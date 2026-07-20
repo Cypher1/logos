@@ -3,6 +3,7 @@ mod config;
 mod kb;
 mod ui;
 
+use crate::commands::AppContext;
 use crate::config::Config;
 use crate::kb::{KB, Tuple};
 use crate::ui::{LogosUI, UIFocus};
@@ -308,6 +309,33 @@ where
         if user_input.trim().is_empty() {
             return Ok(());
         }
+        if user_input.starts_with(commands::COMMAND_PREFIX) {
+            let user_input = user_input
+                .strip_prefix(commands::COMMAND_PREFIX)
+                .expect("Check prefix should remove without error");
+            let mut args = vec![];
+            let name = if user_input.contains(" ") {
+                let mut parts: Vec<&str> = user_input.split(" ").collect();
+                let name = parts.remove(0);
+                args.extend(parts);
+                name
+            } else {
+                user_input
+            };
+            self.registry.execute(
+                name,
+                args,
+                &mut AppContext {
+                    kb: &mut self.kb,
+                    ui: &mut self.ui,
+                },
+            )?;
+            return Ok(());
+        }
+        self.send_message(user_input)
+    }
+
+    fn send_message(&mut self, user_input: String) -> Result<()> {
         self.ui.messages.push(format!("You: {}", user_input));
         if self.ui.input_history.is_empty() || self.ui.input_history[0] != user_input {
             self.ui.input_history.insert(0, user_input.clone());
