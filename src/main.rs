@@ -22,7 +22,7 @@ use ollama_rs::{
 use ratatui::{Terminal, backend::Backend, backend::CrosstermBackend};
 use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
-use std::io::{Stdout, Write};
+use std::io::Write;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use tokio_stream::StreamExt;
@@ -79,53 +79,68 @@ where
             self.update_kb_view()?;
             self.terminal.draw(|f| self.ui.render(f))?;
 
-            while let Ok(resp) = self.rx.try_recv() {
-                match resp {
-                    Ok(ChatMessageResponse { done: true, .. }) => {}
-                    Ok(ChatMessageResponse {
-                        message: ChatMessage { content: chunk, .. },
-                        done: false,
-                        ..
-                    }) => {
-                        if let Some(last_msg) = self.ui.messages.last_mut() {
-                            if last_msg.starts_with("Ollama: ") {
-                                last_msg.push_str(&chunk);
-                            } else {
-                                self.ui.messages.push(format!("Ollama: {}", chunk));
-                            }
-                        } else {
-                            self.ui.messages.push(format!("Ollama: {}", chunk));
-                        }
-                    }
-                    Err(e) => {
-                        self.ui.messages.push(format!("Error from Ollama: {}", e));
-                    }
-                }
-            }
+            // TODO: Handle AI requests to continue/suspend?
+            let _ = self.handle_messages().await?;
 
             match self.handle_input().await? {
                 InputSignal::Continue => {}
                 InputSignal::Break => break,
                 InputSignal::Suspend => {
-                    disable_raw_mode().unwrap();
-                    execute!(
-                        self.terminal.backend_mut(),
-                        LeaveAlternateScreen,
-                        DisableMouseCapture
-                    )?;
+                    self.leave().await?;
                     signal_hook::low_level::emulate_default_handler(SIGTSTP).unwrap();
-                    enable_raw_mode().unwrap();
-                    execute!(
-                        self.terminal.backend_mut(),
-                        EnterAlternateScreen,
-                        EnableMouseCapture
-                    )?;
-                    self.terminal.clear()?;
-                    continue;
+                    self.enter().await?;
                 }
             }
         }
         Ok(())
+    }
+
+    async fn enter(&mut self) -> Result<()> {
+        enable_raw_mode().unwrap();
+        execute!(
+            self.terminal.backend_mut(),
+            EnterAlternateScreen,
+            EnableMouseCapture
+        )?;
+        self.terminal.clear()?;
+        Ok(())
+    }
+    async fn leave(&mut self) -> Result<()> {
+        disable_raw_mode().unwrap();
+        execute!(
+            self.terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
+        self.terminal.show_cursor()?;
+        Ok(())
+    }
+
+    async fn handle_messages(&mut self) -> Result<InputSignal> {
+        while let Ok(resp) = self.rx.try_recv() {
+            match resp {
+                Ok(ChatMessageResponse { done: true, .. }) => {}
+                Ok(ChatMessageResponse {
+                    message: ChatMessage { content: chunk, .. },
+                    done: false,
+                    ..
+                }) => {
+                    if let Some(last_msg) = self.ui.messages.last_mut() {
+                        if last_msg.starts_with("Ollama: ") {
+                            last_msg.push_str(&chunk);
+                        } else {
+                            self.ui.messages.push(format!("Ollama: {}", chunk));
+                        }
+                    } else {
+                        self.ui.messages.push(format!("Ollama: {}", chunk));
+                    }
+                }
+                Err(e) => {
+                    self.ui.messages.push(format!("Error from Ollama: {}", e));
+                }
+            }
+        }
+        Ok(InputSignal::Continue)
     }
 
     async fn handle_input(&mut self) -> Result<InputSignal> {
@@ -189,57 +204,7 @@ where
 
                 match self.ui.focus {
                     UIFocus::Input => match key.code {
-                        KeyCode::Enter => {
-                            let user_input = self.ui.input_textarea.lines().join("\n");
-                            if !user_input.trim().is_empty() {
-                                self.ui.messages.push(format!("You: {}", user_input));
-                                if self.ui.input_history.is_empty()
-                                    || self.ui.input_history[0] != user_input
-                                {
-                                    self.ui.input_history.insert(0, user_input.clone());
-                                }
-                                self.ui.history_pos = None;
-                                self.ui.input_textarea.clear();
-
-                                let tx = self.tx.clone();
-                                let config = self.config.clone();
-                                let history_ref = self.history.clone();
-                                tokio::spawn(async move {
-                                    let ollama = Ollama::default();
-                                    let mut stream: ChatMessageResponseStream = match ollama
-                                        .send_chat_messages_with_history_stream(
-                                            history_ref,
-                                            ChatMessageRequest::new(
-                                                config.model,
-                                                vec![ChatMessage::user(user_input)],
-                                            )
-                                            .options(
-                                                ModelOptions::default()
-                                                    .temperature(config.temperature)
-                                                    .num_predict(config.max_tokens)
-                                                    .top_p(config.top_p)
-                                                    .top_k(config.top_k)
-                                                    .repeat_penalty(config.repeat_penalty)
-                                                    .stop(config.stop),
-                                            ),
-                                        )
-                                        .await
-                                    {
-                                        Ok(s) => s,
-                                        Err(e) => {
-                                            let _ = tx.send(Err(anyhow!("{}", e)));
-                                            return;
-                                        }
-                                    };
-
-                                    while let Some(result) = stream.next().await {
-                                        if let Ok(result) = result {
-                                            let _ = tx.send(Ok(result));
-                                        }
-                                    }
-                                });
-                            }
-                        }
+                        KeyCode::Enter => self.submit_input()?,
                         KeyCode::Up => {
                             let pos = match self.ui.history_pos {
                                 None => {
@@ -337,15 +302,53 @@ where
         }
         Ok(InputSignal::Continue)
     }
-}
 
-fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
-    let mut stdout = std::io::stdout();
-    enable_raw_mode()?;
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
+    fn submit_input(&mut self) -> Result<()> {
+        let user_input = self.ui.input_textarea.lines().join("\n");
+        if user_input.trim().is_empty() {
+            return Ok(());
+        }
+        self.ui.messages.push(format!("You: {}", user_input));
+        if self.ui.input_history.is_empty() || self.ui.input_history[0] != user_input {
+            self.ui.input_history.insert(0, user_input.clone());
+        }
+        self.ui.history_pos = None;
+        self.ui.input_textarea.clear();
+
+        let tx = self.tx.clone();
+        let config = self.config.clone();
+        let history_ref = self.history.clone();
+        tokio::spawn(async move {
+            let ollama = Ollama::default();
+            let options = ModelOptions::default()
+                .temperature(config.temperature)
+                .num_predict(config.max_tokens)
+                .top_p(config.top_p)
+                .top_k(config.top_k)
+                .repeat_penalty(config.repeat_penalty)
+                .stop(config.stop);
+            let request =
+                ChatMessageRequest::new(config.model, vec![ChatMessage::user(user_input)])
+                    .options(options);
+            let stream = ollama
+                .send_chat_messages_with_history_stream(history_ref, request)
+                .await;
+            let mut stream: ChatMessageResponseStream = match stream {
+                Ok(s) => s,
+                Err(e) => {
+                    let _ = tx.send(Err(anyhow!("{}", e)));
+                    return;
+                }
+            };
+
+            while let Some(result) = stream.next().await {
+                if let Ok(result) = result {
+                    let _ = tx.send(Ok(result));
+                }
+            }
+        });
+        Ok(())
+    }
 }
 
 #[tokio::main]
@@ -356,19 +359,17 @@ async fn main() -> Result<()> {
     let kb = KB::new("logos.db")?;
     let tuple = Tuple::new("Alice", "knows", "Bob", 0.9);
     kb.store_tuple(&tuple)?;
+    let tuple = Tuple::new("Bob", "knows", "Eve", 0.1);
+    kb.store_tuple(&tuple)?;
 
-    let terminal = setup_terminal()?;
+    let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
     let mut app = App::new(config, kb, terminal);
+
+    app.enter().await?;
 
     app.run().await?;
 
-    execute!(
-        app.terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    disable_raw_mode()?;
-    app.terminal.show_cursor()?;
+    app.leave().await?;
 
     Ok(())
 }

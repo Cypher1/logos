@@ -1,6 +1,3 @@
-use std::any::Any;
-use std::fmt::Debug;
-
 pub type CommandFn = Box<dyn Fn(&mut AppContext) -> Result<(), String> + Send + Sync>;
 
 pub struct CommandRegistry {
