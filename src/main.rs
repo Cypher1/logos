@@ -7,12 +7,15 @@ use crate::commands::AppContext;
 use crate::config::Config;
 use crate::kb::{KB, Tuple};
 use crate::ui::{LogosUI, UIFocus};
-use anyhow::{Result, anyhow};
+#[cfg(feature="ollama")]
+use anyhow::anyhow;
+use anyhow::{Context, Result};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+#[cfg(feature="ollama")]
 use ollama_rs::{
     Ollama,
     generation::chat::{
@@ -24,8 +27,12 @@ use ratatui::{Terminal, backend::Backend, backend::CrosstermBackend};
 use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
 use std::io::Write;
+use std::path::PathBuf;
+#[cfg(feature="ollama")]
 use std::sync::mpsc;
+#[cfg(feature="ollama")]
 use std::sync::{Arc, Mutex};
+#[cfg(feature="ollama")]
 use tokio_stream::StreamExt;
 
 enum InputSignal {
@@ -39,8 +46,11 @@ struct App<'a, B: Backend> {
     kb: KB,
     terminal: Terminal<B>,
     ui: LogosUI<'a>,
+    #[cfg(feature="ollama")]
     tx: mpsc::Sender<Result<ChatMessageResponse>>,
+    #[cfg(feature="ollama")]
     rx: mpsc::Receiver<Result<ChatMessageResponse>>,
+    #[cfg(feature="ollama")]
     history: Arc<Mutex<Vec<ChatMessage>>>,
     registry: commands::CommandRegistry,
 }
@@ -50,15 +60,20 @@ where
     <B as Backend>::Error: 'static + Sync + Send,
 {
     fn new(config: Config, kb: KB, terminal: Terminal<B>) -> Self {
+        #[cfg(feature="ollama")]
         let (tx, rx) = mpsc::channel();
+        #[cfg(feature="ollama")]
         let history = Arc::new(Mutex::new(vec![]));
         App {
             config,
             kb,
             terminal,
             ui: LogosUI::new(),
+            #[cfg(feature="ollama")]
             tx,
+            #[cfg(feature="ollama")]
             rx,
+            #[cfg(feature="ollama")]
             history,
             registry: commands::get_default_registry(),
         }
@@ -70,7 +85,8 @@ where
         self.kb.for_each_tuple(|tuple| {
             self.ui.knowledge_base.push(tuple.to_string());
             count += 1;
-        })?;
+        })
+        .context("loading kb")?;
         self.ui.system_state = format!("Loaded {} tuples from KB", count);
         Ok(())
     }
@@ -81,6 +97,7 @@ where
             self.terminal.draw(|f| self.ui.render(f))?;
 
             // TODO: Handle AI requests to continue/suspend?
+            #[cfg(feature="ollama")]
             let _ = self.handle_messages().await?;
 
             match self.handle_input().await? {
@@ -117,6 +134,7 @@ where
         Ok(())
     }
 
+    #[cfg(feature="ollama")]
     async fn handle_messages(&mut self) -> Result<InputSignal> {
         while let Ok(resp) = self.rx.try_recv() {
             match resp {
@@ -343,38 +361,41 @@ where
         self.ui.history_pos = None;
         self.ui.input_textarea.clear();
 
-        let tx = self.tx.clone();
-        let config = self.config.clone();
-        let history_ref = self.history.clone();
-        tokio::spawn(async move {
-            let ollama = Ollama::default();
-            let options = ModelOptions::default()
-                .temperature(config.temperature)
-                .num_predict(config.max_tokens)
-                .top_p(config.top_p)
-                .top_k(config.top_k)
-                .repeat_penalty(config.repeat_penalty)
-                .stop(config.stop);
-            let request =
-                ChatMessageRequest::new(config.model, vec![ChatMessage::user(user_input)])
-                    .options(options);
-            let stream = ollama
-                .send_chat_messages_with_history_stream(history_ref, request)
-                .await;
-            let mut stream: ChatMessageResponseStream = match stream {
-                Ok(s) => s,
-                Err(e) => {
-                    let _ = tx.send(Err(anyhow!("{}", e)));
-                    return;
-                }
-            };
+        #[cfg(feature="ollama")]
+        {
+            let tx = self.tx.clone();
+            let config = self.config.clone();
+            let history_ref = self.history.clone();
+            tokio::spawn(async move {
+                let ollama = Ollama::default();
+                let options = ModelOptions::default()
+                    .temperature(config.temperature)
+                    .num_predict(config.max_tokens)
+                    .top_p(config.top_p)
+                    .top_k(config.top_k)
+                    .repeat_penalty(config.repeat_penalty)
+                    .stop(config.stop);
+                let request =
+                    ChatMessageRequest::new(config.model, vec![ChatMessage::user(user_input)])
+                        .options(options);
+                let stream = ollama
+                    .send_chat_messages_with_history_stream(history_ref, request)
+                    .await;
+                let mut stream: ChatMessageResponseStream = match stream {
+                    Ok(s) => s,
+                    Err(e) => {
+                        let _ = tx.send(Err(anyhow!("{}", e)));
+                        return;
+                    }
+                };
 
-            while let Some(result) = stream.next().await {
-                if let Ok(result) = result {
-                    let _ = tx.send(Ok(result));
+                while let Some(result) = stream.next().await {
+                    if let Ok(result) = result {
+                        let _ = tx.send(Ok(result));
+                    }
                 }
-            }
-        });
+            });
+        }
         Ok(())
     }
 }
@@ -384,7 +405,7 @@ async fn main() -> Result<()> {
     let config = Config::load()?;
     println!("Loaded config: {:?}", config);
 
-    let kb = KB::new("logos.db")?;
+    let kb = KB::new(PathBuf::from("logos.db"))?;
     let tuple = Tuple::new("Alice", "knows", "Bob", 0.9);
     kb.store_tuple(&tuple)?;
     let tuple = Tuple::new("Bob", "knows", "Eve", 0.1);

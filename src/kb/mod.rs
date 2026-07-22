@@ -10,9 +10,10 @@ pub mod tuple;
 pub use tuple::Ent;
 pub use tuple::{Tuple, TupleID};
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use redb::{Database, MultimapTableDefinition, ReadableDatabase, ReadableTable, TableDefinition};
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 const TUPLES_TABLE: TableDefinition<u64, &[u8]> = TableDefinition::new("tuples");
 const PREDICATE_TABLE: MultimapTableDefinition<&str, u64> =
@@ -29,18 +30,21 @@ pub struct KB {
 
 impl KB {
     /// Creates a new KnowledgeBase instance.
-    pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let db = Database::create(path)?;
+    pub fn new(path: PathBuf) -> Result<Self> {
+        let db = Database::create(&path)
+            .with_context(|| format!("opening kb database at {}", path.display()))?;
 
         // Initialize the table by opening a write transaction and committing it
-        let write_txn = db.begin_write()?;
+        let write_txn = db.begin_write()
+            .with_context(|| format!("starting transaction on db {}", path.display()))?;
         {
             let _table = write_txn.open_table(TUPLES_TABLE)?;
             let _pred_table = write_txn.open_multimap_table(PREDICATE_TABLE)?;
             let _sub_table = write_txn.open_multimap_table(SUBJECT_TABLE)?;
             let _obj_table = write_txn.open_multimap_table(OBJECT_TABLE)?;
         }
-        write_txn.commit()?;
+        write_txn.commit()
+            .with_context(|| format!("commiting transaction on db {}", path.display()))?;
 
         Ok(KB { db })
     }
