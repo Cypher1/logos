@@ -10,7 +10,7 @@ pub mod tuple;
 pub use tuple::Ent;
 pub use tuple::{Tuple, TupleID};
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use redb::{Database, MultimapTableDefinition, ReadableDatabase, ReadableTable, TableDefinition};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -35,7 +35,8 @@ impl KB {
             .with_context(|| format!("opening kb database at {}", path.display()))?;
 
         // Initialize the table by opening a write transaction and committing it
-        let write_txn = db.begin_write()
+        let write_txn = db
+            .begin_write()
             .with_context(|| format!("starting transaction on db {}", path.display()))?;
         {
             let _table = write_txn.open_table(TUPLES_TABLE)?;
@@ -43,7 +44,8 @@ impl KB {
             let _sub_table = write_txn.open_multimap_table(SUBJECT_TABLE)?;
             let _obj_table = write_txn.open_multimap_table(OBJECT_TABLE)?;
         }
-        write_txn.commit()
+        write_txn
+            .commit()
             .with_context(|| format!("commiting transaction on db {}", path.display()))?;
 
         Ok(KB { db })

@@ -7,7 +7,7 @@ use crate::commands::AppContext;
 use crate::config::Config;
 use crate::kb::{KB, Tuple};
 use crate::ui::{LogosUI, UIFocus};
-#[cfg(feature="ollama")]
+#[cfg(feature = "ollama")]
 use anyhow::anyhow;
 use anyhow::{Context, Result};
 use crossterm::{
@@ -15,7 +15,7 @@ use crossterm::{
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-#[cfg(feature="ollama")]
+#[cfg(feature = "ollama")]
 use ollama_rs::{
     Ollama,
     generation::chat::{
@@ -28,11 +28,11 @@ use ratatui_textarea::TextArea;
 use signal_hook::consts::signal::*;
 use std::io::Write;
 use std::path::PathBuf;
-#[cfg(feature="ollama")]
+#[cfg(feature = "ollama")]
 use std::sync::mpsc;
-#[cfg(feature="ollama")]
+#[cfg(feature = "ollama")]
 use std::sync::{Arc, Mutex};
-#[cfg(feature="ollama")]
+#[cfg(feature = "ollama")]
 use tokio_stream::StreamExt;
 
 enum InputSignal {
@@ -46,11 +46,11 @@ struct App<'a, B: Backend> {
     kb: KB,
     terminal: Terminal<B>,
     ui: LogosUI<'a>,
-    #[cfg(feature="ollama")]
+    #[cfg(feature = "ollama")]
     tx: mpsc::Sender<Result<ChatMessageResponse>>,
-    #[cfg(feature="ollama")]
+    #[cfg(feature = "ollama")]
     rx: mpsc::Receiver<Result<ChatMessageResponse>>,
-    #[cfg(feature="ollama")]
+    #[cfg(feature = "ollama")]
     history: Arc<Mutex<Vec<ChatMessage>>>,
     registry: commands::CommandRegistry,
 }
@@ -60,20 +60,20 @@ where
     <B as Backend>::Error: 'static + Sync + Send,
 {
     fn new(config: Config, kb: KB, terminal: Terminal<B>) -> Self {
-        #[cfg(feature="ollama")]
+        #[cfg(feature = "ollama")]
         let (tx, rx) = mpsc::channel();
-        #[cfg(feature="ollama")]
+        #[cfg(feature = "ollama")]
         let history = Arc::new(Mutex::new(vec![]));
         App {
             config,
             kb,
             terminal,
             ui: LogosUI::new(),
-            #[cfg(feature="ollama")]
+            #[cfg(feature = "ollama")]
             tx,
-            #[cfg(feature="ollama")]
+            #[cfg(feature = "ollama")]
             rx,
-            #[cfg(feature="ollama")]
+            #[cfg(feature = "ollama")]
             history,
             registry: commands::get_default_registry(),
         }
@@ -82,11 +82,12 @@ where
     fn update_kb_view(&mut self) -> Result<()> {
         self.ui.knowledge_base.clear();
         let mut count = 0;
-        self.kb.for_each_tuple(|tuple| {
-            self.ui.knowledge_base.push(tuple.to_string());
-            count += 1;
-        })
-        .context("loading kb")?;
+        self.kb
+            .for_each_tuple(|tuple| {
+                self.ui.knowledge_base.push(tuple.to_string());
+                count += 1;
+            })
+            .context("loading kb")?;
         self.ui.system_state = format!("Loaded {} tuples from KB", count);
         Ok(())
     }
@@ -97,7 +98,7 @@ where
             self.terminal.draw(|f| self.ui.render(f))?;
 
             // TODO: Handle AI requests to continue/suspend?
-            #[cfg(feature="ollama")]
+            #[cfg(feature = "ollama")]
             let _ = self.handle_messages().await?;
 
             match self.handle_input().await? {
@@ -134,7 +135,7 @@ where
         Ok(())
     }
 
-    #[cfg(feature="ollama")]
+    #[cfg(feature = "ollama")]
     async fn handle_messages(&mut self) -> Result<InputSignal> {
         while let Ok(resp) = self.rx.try_recv() {
             match resp {
@@ -361,7 +362,7 @@ where
         self.ui.history_pos = None;
         self.ui.input_textarea.clear();
 
-        #[cfg(feature="ollama")]
+        #[cfg(feature = "ollama")]
         {
             let tx = self.tx.clone();
             let config = self.config.clone();
