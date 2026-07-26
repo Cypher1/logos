@@ -14,7 +14,7 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 fn setup_kb(name: &str) -> Result<(KB, String)> {
     let path = format!("test_{}.db", name);
     let _ = fs::remove_file(&path);
-    let kb = KB::new(&path)?;
+    let kb = KB::new((&path).into())?;
     Ok((kb, path))
 }
 

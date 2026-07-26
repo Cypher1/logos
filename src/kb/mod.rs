@@ -10,7 +10,7 @@ pub mod tuple;
 pub use tuple::Ent;
 pub use tuple::{Tuple, TupleID};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use redb::{Database, MultimapTableDefinition, ReadableDatabase, ReadableTable, TableDefinition};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -70,9 +70,9 @@ impl KB {
                 let value = serde_json::to_vec(tuple)?;
 
                 table.insert(id, value.as_slice())?;
-                pred_table.insert(format!("pred::{}", tuple.predicate).as_str(), &id)?;
-                sub_table.insert(format!("sub::{}", tuple.subject).as_str(), &id)?;
-                obj_table.insert(format!("obj::{}", tuple.object).as_str(), &id)?;
+                pred_table.insert(format!("{}", tuple.predicate).as_str(), &id)?;
+                sub_table.insert(format!("{}", tuple.subject).as_str(), &id)?;
+                obj_table.insert(format!("{}", tuple.object).as_str(), &id)?;
             }
         }
         write_txn.commit()?;
@@ -127,31 +127,30 @@ impl KB {
 
     /// Retrieves all tuples with a specific subject.
     pub fn retrieve_by_subject(&self, subject: impl Into<Ent>) -> Result<HashSet<TupleID>> {
-        self.retrieve_by_index(SUBJECT_TABLE, "sub", subject.into())
+        self.retrieve_by_index(SUBJECT_TABLE, subject.into())
     }
 
     /// Retrieves all tuples with a specific predicate.
     pub fn retrieve_by_predicate(&self, predicate: impl Into<Ent>) -> Result<HashSet<TupleID>> {
-        self.retrieve_by_index(PREDICATE_TABLE, "pred", predicate.into())
+        self.retrieve_by_index(PREDICATE_TABLE, predicate.into())
     }
 
     /// Retrieves all tuples with a specific object.
     pub fn retrieve_by_object(&self, object: impl Into<Ent>) -> Result<HashSet<TupleID>> {
-        self.retrieve_by_index(OBJECT_TABLE, "obj", object.into())
+        self.retrieve_by_index(OBJECT_TABLE, object.into())
     }
 
     /// Helper to retrieve Tuples by an index key (subject/predicate/object).
     fn retrieve_by_index(
         &self,
         table_def: MultimapTableDefinition<&str, u64>,
-        prefix: &str,
         entity: Ent,
     ) -> Result<HashSet<TupleID>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_multimap_table(table_def)?;
         let mut results = HashSet::new();
 
-        for row in table.get(format!("{}::{}", prefix, entity).as_str())? {
+        for row in table.get(format!("{}", entity).as_str())? {
             let tuple: TupleID = row?.value();
             results.insert(tuple);
         }
@@ -169,7 +168,7 @@ impl KB {
         let mut results = Vec::new();
 
         for id in ids {
-            if let Some(row) = table.get(id)? {
+            if let Some(row) = table.get(*id)? {
                 let tuple: Tuple = serde_json::from_slice(row.value())?;
                 results.push(tuple);
             }
