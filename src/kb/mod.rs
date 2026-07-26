@@ -10,7 +10,7 @@ pub mod tuple;
 pub use tuple::Ent;
 pub use tuple::{Tuple, TupleID};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use redb::{Database, MultimapTableDefinition, ReadableDatabase, ReadableTable, TableDefinition};
 use std::collections::HashSet;
 use std::path::PathBuf;
