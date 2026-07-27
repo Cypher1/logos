@@ -5,7 +5,7 @@ pub type CommandFn = Box<dyn Fn(&mut AppContext, Vec<&str>) -> Result<()> + Send
 pub static COMMAND_PREFIX: &str = "/";
 
 pub struct CommandRegistry {
-    commands: std::collections::HashMap<String, CommandFn>,
+    commands: std::collections::HashMap<String, (CommandFn, String)>,
 }
 
 impl CommandRegistry {
@@ -15,18 +15,18 @@ impl CommandRegistry {
         }
     }
 
-    pub fn register(&mut self, name: &str, cmd: CommandFn) {
-        self.commands.insert(name.to_string(), cmd);
+    pub fn register(&mut self, name: &str, desc: &str, cmd: CommandFn) {
+        self.commands.insert(name.to_string(), (cmd, desc.to_string()));
     }
 
     pub fn get(&self, name: &str) -> Option<&CommandFn> {
-        self.commands.get(name)
+        self.commands.get(name).map(|(cmd, _)| cmd)
     }
 
-    pub fn list_commands(&self) -> Vec<String> {
-        let mut keys: Vec<_> = self.commands.keys().cloned().collect();
-        keys.sort();
-        keys
+    pub fn list_commands(&self) -> Vec<(String, String)> {
+        let mut entries: Vec<_> = self.commands.iter().map(|(k, (_v, d))| (k.clone(), d.clone())).collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
     }
 }
 
@@ -52,24 +52,23 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "help",
+        "Show available commands and their descriptions",
         Box::new(|ctx, _args| {
-            let help_msg = format!(
-                "Available commands: {}",
-                ctx.registry
-                    .list_commands()
-                    .iter()
-                    .map(|c| format!("/{}", c))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
+            let entries = ctx.registry.list_commands();
+            let mut help_msg = String::from("Available commands:\n");
+            for (name, desc) in entries {
+                // Columnar formatting: /command      - description
+                help_msg.push_str(&format!("  /{:<15} - {}\n", name, desc));
+            }
 
-            ctx.ui.messages.push(help_msg.clone());
+            ctx.ui.messages.push(help_msg);
             Ok(())
         }),
     );
 
     registry.register(
         "clear",
+        "Clear the chat history",
         Box::new(|ctx, _args| {
             ctx.ui.messages.clear();
             ctx.ui.messages.push("Chat cleared.".to_string());
@@ -79,6 +78,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "kb",
+        "Show Knowledge Base update status",
         Box::new(|ctx, _args| {
             let status = format!("KB updated at {:?}", std::time::SystemTime::now());
             ctx.ui.system_state.push_str(&format!("\n{}", status));
@@ -91,6 +91,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-id",
+        "Retrieve a tuple by its unique ID (Usage: /retrieve-id <ID>)",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 ctx.ui.messages.push("Usage: /retrieve-id <ID>".to_string());
@@ -117,6 +118,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-tuple",
+        "Retrieve a tuple by subject, predicate, and object (Usage: /retrieve-tuple <subject> <predicate> <object>)",
         Box::new(|ctx, args| {
             if args.len() < 3 {
                 ctx.ui
@@ -132,6 +134,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-subject",
+        "Retrieve all IDs for a specific subject (Usage: /retrieve-subject <subject>)",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 ctx.ui
@@ -152,6 +155,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-predicate",
+        "Retrieve all IDs for a specific predicate (Usage: /retrieve-predicate <predicate>)",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 ctx.ui
@@ -172,6 +176,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-object",
+        "Retrieve all IDs for a specific object (Usage: /retrieve-object <object>)",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 ctx.ui
@@ -192,6 +197,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-multiple",
+        "Retrieve multiple tuples by IDs (Usage: /retrieve-multiple <id1> <id2> ...)",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 ctx.ui

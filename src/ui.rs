@@ -377,6 +377,7 @@ impl<'a> LogosUI<'a> {
         // Draw the textarea widget inside the input area
         let mut textarea = self.input_textarea.clone();
         textarea.set_block(block);
+        textarea.set_placeholder_text(" /help · Ctrl+C quit");
         frame.render_widget(&textarea, area);
     }
 }
