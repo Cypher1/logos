@@ -341,13 +341,14 @@ where
             } else {
                 user_input
             };
-            self.registry.execute(
+            let mut context = AppContext {
+                registry: &mut self.registry,
+                kb: &mut self.kb,
+                ui: &mut self.ui,
+            };
+            context.execute(
                 name,
                 args,
-                &mut AppContext {
-                    kb: &mut self.kb,
-                    ui: &mut self.ui,
-                },
             )?;
             return Ok(());
         }

@@ -19,20 +19,32 @@ impl CommandRegistry {
         self.commands.insert(name.to_string(), cmd);
     }
 
-    pub fn execute(&self, name: &str, parts: Vec<&str>, context: &mut AppContext) -> Result<()> {
-        if let Some(cmd) = self.commands.get(name) {
-            cmd(context, parts)
-        } else {
-            Err(anyhow!("Unknown command: /{}", name))
-        }
+    pub fn get(&self, name: &str) -> Option<&CommandFn> {
+        self.commands.get(name)
+    }
+
+    pub fn list_commands(&self) -> Vec<String> {
+        let mut keys: Vec<_> = self.commands.keys().cloned().collect();
+        keys.sort();
+        keys
     }
 }
 
 /// Context passed to executed commands
 pub struct AppContext<'a, 'b> {
+    pub registry: &'a CommandRegistry,
     pub ui: &'a mut crate::ui::LogosUI<'b>,
-    #[allow(unused)]
     pub kb: &'a mut crate::kb::KB,
+}
+
+impl<'a, 'b> AppContext<'a, 'b> {
+    pub fn execute(&mut self, name: &str, parts: Vec<&str>) -> Result<()> {
+        if let Some(cmd) = self.registry.get(name) {
+            cmd(self, parts)
+        } else {
+            Err(anyhow!("Unknown command: /{}", name))
+        }
+    }
 }
 
 pub fn get_default_registry() -> CommandRegistry {
@@ -41,9 +53,17 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "help",
         Box::new(|ctx, _args| {
-            ctx.ui
-                .messages
-                .push("Available commands: /help, /clear, /kb".to_string());
+            let help_msg = format!(
+                "Available commands: {}",
+                ctx.registry
+                    .list_commands()
+                    .iter()
+                    .map(|c| format!("/{}", c))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+
+            ctx.ui.messages.push(help_msg.clone());
             Ok(())
         }),
     );
@@ -72,7 +92,7 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "retrieve-id",
         Box::new(|ctx, args| {
-            if args.len() < 1 {
+            if args.is_empty() {
                 ctx.ui.messages.push("Usage: /retrieve-id <ID>".to_string());
                 return Ok(());
             }
@@ -113,7 +133,7 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "retrieve-subject",
         Box::new(|ctx, args| {
-            if args.len() < 1 {
+            if args.is_empty() {
                 ctx.ui
                     .messages
                     .push("Usage: /retrieve-subject <subject>".to_string());
@@ -133,7 +153,7 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "retrieve-predicate",
         Box::new(|ctx, args| {
-            if args.len() < 1 {
+            if args.is_empty() {
                 ctx.ui
                     .messages
                     .push("Usage: /retrieve-predicate <predicate>".to_string());
@@ -153,7 +173,7 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "retrieve-object",
         Box::new(|ctx, args| {
-            if args.len() < 1 {
+            if args.is_empty() {
                 ctx.ui
                     .messages
                     .push("Usage: /retrieve-object <object>".to_string());
