@@ -33,6 +33,16 @@ impl CommandRegistry {
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         entries
     }
+
+    pub fn find_matches(&self, prefix: &str) -> Vec<String> {
+        let mut matches = Vec::new();
+        for name in self.commands.keys() {
+            if name.starts_with(prefix) {
+                matches.push(name.clone());
+            }
+        }
+        matches
+    }
 }
 
 /// Context passed to executed commands

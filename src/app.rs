@@ -11,7 +11,7 @@ use crossterm::terminal::{
 };
 
 use ratatui::{Terminal, backend::Backend};
-use ratatui_textarea::TextArea;
+use ratatui_textarea::{CursorMove, TextArea};
 use signal_hook::consts::signal::SIGTSTP;
 
 use std::io::Write;
@@ -233,6 +233,8 @@ where
                             self.ui.history_pos = Some(pos);
                             if let Some(hist) = self.ui.input_history.get(pos) {
                                 self.ui.input_textarea = TextArea::from(hist.lines());
+                                self.ui.input_textarea.move_cursor(CursorMove::Bottom);
+                                self.ui.input_textarea.move_cursor(CursorMove::End);
                             }
                         }
                         KeyCode::Down => match self.ui.history_pos {
@@ -254,6 +256,8 @@ where
                                 self.ui.history_pos = Some(pos - 1);
                                 if let Some(hist) = self.ui.input_history.get(pos - 1) {
                                     self.ui.input_textarea = TextArea::from(hist.lines());
+                                    self.ui.input_textarea.move_cursor(CursorMove::Bottom);
+                                    self.ui.input_textarea.move_cursor(CursorMove::End);
                                 }
                             }
                         },
@@ -266,6 +270,26 @@ where
                                     UIFocus::Planning => UIFocus::Input,
                                 };
                                 self.ui.focus = next_focus;
+                            } else if self.ui.focus == UIFocus::Input {
+                                let current_text = self.ui.input_textarea.lines().join("\n");
+                                if let Some(prefix) = current_text.strip_prefix(COMMAND_PREFIX) {
+                                    let tail = current_text
+                                        .strip_prefix(&format!("{}{}", COMMAND_PREFIX, prefix))
+                                        .unwrap_or_default();
+                                    // TODO: Add UI for selecting a match.
+                                    // For now select the first match.
+                                    let matches = self.registry.find_matches(prefix);
+                                    if !matches.is_empty() {
+                                        // Take the first match as simple autocomplete
+                                        let best_match = &matches[0];
+                                        self.ui.input_textarea = TextArea::from(
+                                            format!("{}{} {}", COMMAND_PREFIX, best_match, tail,)
+                                                .lines(),
+                                        );
+                                        let new_pos = COMMAND_PREFIX.chars().count() + best_match.chars().count();
+                                        self.ui.input_textarea.move_cursor(CursorMove::Jump(0, new_pos as u16));
+                                    }
+                                }
                             }
                         }
                         _ => {
