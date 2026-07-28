@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{Result, bail};
 
 pub type CommandFn = Box<dyn Fn(&mut AppContext, Vec<&str>) -> Result<()> + Send + Sync>;
 
@@ -54,11 +54,10 @@ pub struct AppContext<'a, 'b> {
 
 impl<'a, 'b> AppContext<'a, 'b> {
     pub fn execute(&mut self, name: &str, parts: Vec<&str>) -> Result<()> {
-        if let Some(cmd) = self.registry.get(name) {
-            cmd(self, parts)
-        } else {
-            Err(anyhow!("Unknown command: /{}", name))
-        }
+        let Some(cmd) = self.registry.get(name) else {
+            bail!("Unknown command: /{}", name)
+        };
+        cmd(self, parts)
     }
 }
 

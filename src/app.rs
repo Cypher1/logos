@@ -92,7 +92,8 @@ where
                 InputSignal::Break => break,
                 InputSignal::Suspend => {
                     self.leave().await?;
-                    signal_hook::low_level::emulate_default_handler(SIGTSTP).unwrap();
+                    signal_hook::low_level::emulate_default_handler(SIGTSTP)
+                        .with_context(|| "Failed to emulate signal handler")?;
                     self.enter().await?;
                 }
             }
@@ -101,7 +102,7 @@ where
     }
 
     pub async fn enter(&mut self) -> Result<()> {
-        enable_raw_mode().unwrap();
+        enable_raw_mode().with_context(|| "Failed to enable raw mode")?;
         execute!(
             self.terminal.backend_mut(),
             EnterAlternateScreen,
@@ -112,7 +113,7 @@ where
     }
 
     pub async fn leave(&mut self) -> Result<()> {
-        disable_raw_mode().unwrap();
+        disable_raw_mode().with_context(|| "Failed to disable raw mode")?;
         execute!(
             self.terminal.backend_mut(),
             LeaveAlternateScreen,
@@ -272,22 +273,29 @@ where
                                 self.ui.focus = next_focus;
                             } else if self.ui.focus == UIFocus::Input {
                                 let current_text = self.ui.input_textarea.lines().join("\n");
-                                if let Some(prefix) = current_text.strip_prefix(COMMAND_PREFIX) {
-                                    let tail = current_text
-                                        .strip_prefix(&format!("{}{}", COMMAND_PREFIX, prefix))
-                                        .unwrap_or_default();
+                                if let Some(command_str) = current_text.strip_prefix(COMMAND_PREFIX)
+                                {
+                                    let index = command_str.find(' ').unwrap_or(command_str.len());
+                                    let (head, tail) = command_str.split_at(index);
+                                    let mut tail = tail.to_string();
+                                    if !tail.starts_with(" ") {
+                                        tail = format!(" {}", tail);
+                                    }
                                     // TODO: Add UI for selecting a match.
                                     // For now select the first match.
-                                    let matches = self.registry.find_matches(prefix);
+                                    let matches = self.registry.find_matches(head);
                                     if !matches.is_empty() {
                                         // Take the first match as simple autocomplete
                                         let best_match = &matches[0];
                                         self.ui.input_textarea = TextArea::from(
-                                            format!("{}{} {}", COMMAND_PREFIX, best_match, tail,)
+                                            format!("{}{}{}", COMMAND_PREFIX, best_match, tail,)
                                                 .lines(),
                                         );
-                                        let new_pos = COMMAND_PREFIX.chars().count() + best_match.chars().count();
-                                        self.ui.input_textarea.move_cursor(CursorMove::Jump(0, new_pos as u16));
+                                        let new_pos = COMMAND_PREFIX.chars().count()
+                                            + best_match.chars().count();
+                                        self.ui
+                                            .input_textarea
+                                            .move_cursor(CursorMove::Jump(0, new_pos as u16));
                                     }
                                 }
                             }
@@ -362,7 +370,9 @@ where
                 kb: &mut self.kb,
                 ui: &mut self.ui,
             };
-            context.execute(name, args)?;
+            context.execute(name, args).unwrap_or_else(|e| {
+                self.ui.messages.push(format!("{}", e));
+            });
             return Ok(());
         }
         self.send_message(user_input)
