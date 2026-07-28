@@ -1,6 +1,7 @@
 use crate::commands::{AppContext, COMMAND_PREFIX, CommandRegistry, get_default_registry};
 use crate::config::Config;
 use crate::kb::KB;
+use crate::ui::{LogosUI, UIFocus};
 
 use anyhow::{Context, Result};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, KeyCode, KeyModifiers};
@@ -19,6 +20,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use ollama_rs::generation::chat::request::ChatMessageRequest;
 use ollama_rs::generation::chat::{ChatMessage, ChatMessageResponse};
 use tokio_stream::StreamExt;
+
 pub enum InputSignal {
     Continue,
     Break,
@@ -29,7 +31,7 @@ pub struct App<'a, B: Backend> {
     pub config: Config,
     pub kb: KB,
     pub terminal: Terminal<B>,
-    pub ui: crate::ui::LogosUI<'a>,
+    pub ui: LogosUI<'a>,
     #[cfg(feature = "ollama")]
     pub tx: mpsc::Sender<Result<ollama_rs::generation::chat::ChatMessageResponse>>,
     #[cfg(feature = "ollama")]
@@ -53,7 +55,7 @@ where
             config,
             kb,
             terminal,
-            ui: crate::ui::LogosUI::new(),
+            ui: LogosUI::new(),
             #[cfg(feature = "ollama")]
             tx,
             #[cfg(feature = "ollama")]
@@ -169,13 +171,13 @@ where
                 match mouse_event.kind {
                     event::MouseEventKind::Down(event::MouseButton::Left) => {
                         if contains(self.ui.chat_area) {
-                            self.ui.focus = crate::ui::UIFocus::Chat;
+                            self.ui.focus = UIFocus::Chat;
                         } else if contains(self.ui.kb_area) {
-                            self.ui.focus = crate::ui::UIFocus::KB;
+                            self.ui.focus = UIFocus::KB;
                         } else if contains(self.ui.planning_area) {
-                            self.ui.focus = crate::ui::UIFocus::Planning;
+                            self.ui.focus = UIFocus::Planning;
                         } else if contains(self.ui.input_area) {
-                            self.ui.focus = crate::ui::UIFocus::Input;
+                            self.ui.focus = UIFocus::Input;
                         }
                     }
                     event::MouseEventKind::ScrollUp => {
@@ -208,7 +210,7 @@ where
                 }
 
                 match self.ui.focus {
-                    crate::ui::UIFocus::Input => match key.code {
+                    UIFocus::Input => match key.code {
                         KeyCode::Enter => self.submit_input()?,
                         KeyCode::Up => {
                             let pos = match self.ui.history_pos {
@@ -256,15 +258,23 @@ where
                             }
                         },
                         KeyCode::Tab => {
-                            self.ui.focus = crate::ui::UIFocus::Chat;
+                            if key.modifiers == KeyModifiers::CONTROL {
+                                let next_focus = match self.ui.focus {
+                                    UIFocus::Input => UIFocus::Chat,
+                                    UIFocus::Chat => UIFocus::KB,
+                                    UIFocus::KB => UIFocus::Planning,
+                                    UIFocus::Planning => UIFocus::Input,
+                                };
+                                self.ui.focus = next_focus;
+                            }
                         }
                         _ => {
                             self.ui.input_textarea.input(key);
                         }
                     },
-                    crate::ui::UIFocus::Chat => match key.code {
+                    UIFocus::Chat => match key.code {
                         KeyCode::Tab => {
-                            self.ui.focus = crate::ui::UIFocus::KB;
+                            self.ui.focus = UIFocus::KB;
                         }
                         KeyCode::Up => {
                             self.ui.chat_scroll = self.ui.chat_scroll.saturating_sub(1);
@@ -274,9 +284,9 @@ where
                         }
                         _ => {}
                     },
-                    crate::ui::UIFocus::KB => match key.code {
+                    UIFocus::KB => match key.code {
                         KeyCode::Tab => {
-                            self.ui.focus = crate::ui::UIFocus::Planning;
+                            self.ui.focus = UIFocus::Planning;
                         }
                         KeyCode::Up => {
                             self.ui.kb_scroll = self.ui.kb_scroll.saturating_sub(1);
@@ -289,9 +299,9 @@ where
                         }
                         _ => {}
                     },
-                    crate::ui::UIFocus::Planning => match key.code {
+                    UIFocus::Planning => match key.code {
                         KeyCode::Tab => {
-                            self.ui.focus = crate::ui::UIFocus::Input;
+                            self.ui.focus = UIFocus::Input;
                         }
                         KeyCode::Up => {
                             self.ui.planning_scroll = self.ui.planning_scroll.saturating_sub(1);
