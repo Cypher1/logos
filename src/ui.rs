@@ -173,7 +173,10 @@ impl<'a> LogosUI<'a> {
         let text: Text = self
             .messages
             .iter()
-            .flat_map(|msg| msg.lines().map(|line| Line::from(vec![Span::raw(line.to_string())])))
+            .flat_map(|msg| {
+                msg.lines()
+                    .map(|line| Line::from(vec![Span::raw(line.to_string())]))
+            })
             .collect();
 
         let inner_area = area.inner(Margin::new(1, 1));

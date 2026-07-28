@@ -16,7 +16,8 @@ impl CommandRegistry {
     }
 
     pub fn register(&mut self, name: &str, desc: &str, cmd: CommandFn) {
-        self.commands.insert(name.to_string(), (cmd, desc.to_string()));
+        self.commands
+            .insert(name.to_string(), (cmd, desc.to_string()));
     }
 
     pub fn get(&self, name: &str) -> Option<&CommandFn> {
@@ -24,7 +25,11 @@ impl CommandRegistry {
     }
 
     pub fn list_commands(&self) -> Vec<(String, String)> {
-        let mut entries: Vec<_> = self.commands.iter().map(|(k, (_v, d))| (k.clone(), d.clone())).collect();
+        let mut entries: Vec<_> = self
+            .commands
+            .iter()
+            .map(|(k, (_v, d))| (k.clone(), d.clone()))
+            .collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         entries
     }

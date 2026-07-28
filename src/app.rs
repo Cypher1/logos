@@ -323,10 +323,7 @@ where
         if user_input.trim().is_empty() {
             return Ok(());
         }
-        if user_input.starts_with(COMMAND_PREFIX) {
-            let user_input = user_input
-                .strip_prefix(COMMAND_PREFIX)
-                .expect("Check prefix should remove without error");
+        if let Some(user_input) = user_input.strip_prefix(COMMAND_PREFIX) {
             let mut args = vec![];
             let name = if user_input.contains(" ") {
                 let mut parts: Vec<&str> = user_input.split(" ").collect();
