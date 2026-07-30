@@ -1,4 +1,6 @@
-use anyhow::{Result, bail};
+use crate::kb::{KB, Tuple};
+use crate::ui::LogosUI;
+use anyhow::{Context, Result, bail};
 
 pub type CommandFn = Box<dyn Fn(&mut AppContext, Vec<&str>) -> Result<()> + Send + Sync>;
 
@@ -48,8 +50,8 @@ impl CommandRegistry {
 /// Context passed to executed commands
 pub struct AppContext<'a, 'b> {
     pub registry: &'a CommandRegistry,
-    pub ui: &'a mut crate::ui::LogosUI<'b>,
-    pub kb: &'a mut crate::kb::KB,
+    pub ui: &'a mut LogosUI<'b>,
+    pub kb: &'a mut KB,
 }
 
 impl<'a, 'b> AppContext<'a, 'b> {
@@ -114,19 +116,17 @@ pub fn get_default_registry() -> CommandRegistry {
             let id = args[0]
                 .parse::<u64>()
                 .map_err(|_| anyhow::anyhow!("Invalid ID format"))?;
-            match ctx.kb.retrieve_by_id(id) {
-                Ok(Some(tuple)) => {
-                    ctx.ui.messages.push(format!("Tuple found: {:?}", tuple));
-                    Ok(())
+            match ctx.kb.retrieve_by_id(id)? {
+                Some(tuple) => {
+                    ctx.ui.messages.push(format!("Tuple found: {}", tuple));
                 }
-                Ok(None) => {
+                None => {
                     ctx.ui
                         .messages
                         .push("No tuple found with that ID.".to_string());
-                    Ok(())
                 }
-                Err(e) => Err(e),
             }
+            Ok(())
         }),
     );
 
@@ -141,7 +141,7 @@ pub fn get_default_registry() -> CommandRegistry {
                 return Ok(());
             }
             let tuple = ctx.kb.retrieve_tuple(args[0], args[1], args[2])?;
-            ctx.ui.messages.push(format!("Tuple found: {:?}", tuple));
+            ctx.ui.messages.push(format!("Tuple found: {}", tuple));
             Ok(())
         }),
     );
@@ -160,7 +160,7 @@ pub fn get_default_registry() -> CommandRegistry {
             let msg = if ids.is_empty() {
                 "No tuples found for subject.".to_string()
             } else {
-                format!("Found IDs: {:?}", ids)
+                format!("Found IDs: {:#?}", ids)
             };
             ctx.ui.messages.push(msg);
             Ok(())
@@ -181,7 +181,7 @@ pub fn get_default_registry() -> CommandRegistry {
             let msg = if ids.is_empty() {
                 "No tuples found for predicate.".to_string()
             } else {
-                format!("Found IDs: {:?}", ids)
+                format!("Found IDs: {:#?}", ids)
             };
             ctx.ui.messages.push(msg);
             Ok(())
@@ -202,7 +202,7 @@ pub fn get_default_registry() -> CommandRegistry {
             let msg = if ids.is_empty() {
                 "No tuples found for object.".to_string()
             } else {
-                format!("Found IDs: {:?}", ids)
+                format!("Found IDs: {:#?}", ids)
             };
             ctx.ui.messages.push(msg);
             Ok(())
@@ -224,7 +224,29 @@ pub fn get_default_registry() -> CommandRegistry {
                 .map(|s| s.parse::<u64>())
                 .collect::<Result<Vec<_>, _>>()?;
             let tuples = ctx.kb.retrieve_multiple_by_ids(&parsed_ids[..])?;
-            ctx.ui.messages.push(format!("Found tuples: {:?}", tuples));
+            ctx.ui.messages.push(format!("Found tuples: {:#?}", tuples));
+            Ok(())
+        }),
+    );
+
+    registry.register(
+        "add",
+        "Add a new tuple to the Knowledge Base (Usage: /add <subject> <predicate> <object>)",
+        Box::new(|ctx, mut args| {
+            let mut confidence = 1.0;
+            if args.len() > 1 && args[1] == "not" {
+                confidence = 0.0;
+                args.remove(1);
+            }
+            if args.len() != 3 {
+                ctx.ui
+                    .messages
+                    .push("Usage: /add <subject> [not] <predicate> <object>".to_string());
+                return Ok(());
+            }
+            let tuple = Tuple::new(args[0], args[1], args[2], confidence);
+            ctx.kb.store_tuple(&tuple).context("Error adding tuple")?;
+            ctx.ui.messages.push(format!("+ {}", tuple));
             Ok(())
         }),
     );

@@ -242,9 +242,7 @@ where
                             None => {
                                 let user_input = self.ui.input_textarea.lines().join("\n");
                                 if !user_input.trim().is_empty() {
-                                    self.ui
-                                        .input_history
-                                        .insert(0, self.ui.input_textarea.lines().join("\n"));
+                                    self.ui.input_history.insert(0, user_input);
                                 }
                                 self.ui.input_textarea.clear();
                                 self.ui.history_pos = None;
@@ -288,7 +286,7 @@ where
                                         // Take the first match as simple autocomplete
                                         let best_match = &matches[0];
                                         self.ui.input_textarea = TextArea::from(
-                                            format!("{}{}{}", COMMAND_PREFIX, best_match, tail,)
+                                            format!("{}{}{}", COMMAND_PREFIX, best_match, tail)
                                                 .lines(),
                                         );
                                         let new_pos = COMMAND_PREFIX.chars().count()
@@ -355,27 +353,43 @@ where
         if user_input.trim().is_empty() {
             return Ok(());
         }
+
         if let Some(user_input) = user_input.strip_prefix(COMMAND_PREFIX) {
             let mut args = vec![];
-            let name = if user_input.contains(" ") {
-                let mut parts: Vec<&str> = user_input.split(" ").collect();
+            let name = if user_input.contains(' ') {
+                let mut parts: Vec<&str> = user_input.split_whitespace().collect();
                 let name = parts.remove(0);
                 args.extend(parts);
                 name
             } else {
                 user_input
             };
+
             let mut context = AppContext {
                 registry: &mut self.registry,
                 kb: &mut self.kb,
                 ui: &mut self.ui,
             };
-            context.execute(name, args).unwrap_or_else(|e| {
-                self.ui.messages.push(format!("{}", e));
-            });
-            return Ok(());
+
+            match context.execute(name, args) {
+                Ok(_) => {
+                    // Success path: update history and clear input
+                    let cmd_line = format!("/{}", user_input.trim());
+                    if self.ui.input_history.is_empty() || self.ui.input_history[0] != cmd_line {
+                        self.ui.input_history.insert(0, cmd_line);
+                    }
+                    self.ui.history_pos = None;
+                    self.ui.input_textarea.clear();
+                }
+                Err(e) => {
+                    // Keep input in area for correction
+                    self.ui.messages.push(format!("{}", e));
+                }
+            }
+            Ok(())
+        } else {
+            self.send_message(user_input)
         }
-        self.send_message(user_input)
     }
 
     pub fn send_message(&mut self, user_input: String) -> Result<()> {
