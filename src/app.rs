@@ -371,6 +371,8 @@ where
                 ui: &mut self.ui,
             };
 
+            let usage = context.get_args(name).to_string();
+
             match context.execute(name, args) {
                 Ok(_) => {
                     // Success path: update history and clear input
@@ -383,7 +385,7 @@ where
                 }
                 Err(e) => {
                     // Keep input in area for correction
-                    self.ui.messages.push(format!("{}", e));
+                    self.ui.messages.push(format!("{}: /{} {}", e, name, usage));
                 }
             }
             Ok(())

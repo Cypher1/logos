@@ -1,13 +1,22 @@
 use crate::kb::{KB, Tuple};
 use crate::ui::LogosUI;
+
 use anyhow::{Context, Result, bail};
+use thiserror::Error;
 
 pub type CommandFn = Box<dyn Fn(&mut AppContext, Vec<&str>) -> Result<()> + Send + Sync>;
 
 pub static COMMAND_PREFIX: &str = "/";
 
+#[derive(Error, Debug)]
+pub enum CommandError {
+    #[error("Usage")]
+    UsageError,
+}
+use CommandError::*;
+
 pub struct CommandRegistry {
-    commands: std::collections::HashMap<String, (CommandFn, String)>,
+    commands: std::collections::HashMap<String, (String, String, CommandFn)>,
 }
 
 impl CommandRegistry {
@@ -17,20 +26,26 @@ impl CommandRegistry {
         }
     }
 
-    pub fn register(&mut self, name: &str, desc: &str, cmd: CommandFn) {
+    pub fn register(&mut self, name: &str, args: &str, desc: &str, cmd: CommandFn) {
         self.commands
-            .insert(name.to_string(), (cmd, desc.to_string()));
+            .insert(name.to_string(), (args.to_string(), desc.to_string(), cmd));
     }
 
     pub fn get(&self, name: &str) -> Option<&CommandFn> {
-        self.commands.get(name).map(|(cmd, _)| cmd)
+        self.commands.get(name).map(|(_, _, cmd)| cmd)
     }
 
-    pub fn list_commands(&self) -> Vec<(String, String)> {
+    pub fn get_args(&self, name: &str) -> Option<&str> {
+        self.commands
+            .get(name)
+            .map(|(args, _desc, _cmd)| args.as_str())
+    }
+
+    pub fn list_commands(&self) -> Vec<(String, String, String)> {
         let mut entries: Vec<_> = self
             .commands
             .iter()
-            .map(|(k, (_v, d))| (k.clone(), d.clone()))
+            .map(|(k, (a, d, _cmd))| (k.clone(), a.clone(), d.clone()))
             .collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
         entries
@@ -55,6 +70,10 @@ pub struct AppContext<'a, 'b> {
 }
 
 impl<'a, 'b> AppContext<'a, 'b> {
+    pub fn get_args(&self, name: &str) -> &str {
+        self.registry.get_args(name).unwrap_or("???")
+    }
+
     pub fn execute(&mut self, name: &str, parts: Vec<&str>) -> Result<()> {
         let Some(cmd) = self.registry.get(name) else {
             bail!("Unknown command: /{}", name)
@@ -68,13 +87,19 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "help",
+        "",
         "Show available commands and their descriptions",
         Box::new(|ctx, _args| {
             let entries = ctx.registry.list_commands();
             let mut help_msg = String::from("Available commands:\n");
-            for (name, desc) in entries {
-                // Columnar formatting: /command      - description
-                help_msg.push_str(&format!("  /{:<15} - {}\n", name, desc));
+            for (name, args, desc) in entries {
+                // Format: /command <args> - description
+                let args_str = if args.is_empty() {
+                    "".to_string()
+                } else {
+                    args
+                };
+                help_msg.push_str(&format!("  /{:<15} {} - {}\n", name, args_str, desc));
             }
 
             ctx.ui.messages.push(help_msg);
@@ -84,6 +109,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "clear",
+        "",
         "Clear the chat history",
         Box::new(|ctx, _args| {
             ctx.ui.messages.clear();
@@ -94,6 +120,7 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "kb",
+        "",
         "Show Knowledge Base update status",
         Box::new(|ctx, _args| {
             let status = format!("KB updated at {:?}", std::time::SystemTime::now());
@@ -107,11 +134,11 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-id",
-        "Retrieve a tuple by its unique ID (Usage: /retrieve-id <ID>)",
+        "<ID>",
+        "Retrieve a tuple by its unique ID",
         Box::new(|ctx, args| {
             if args.is_empty() {
-                ctx.ui.messages.push("Usage: /retrieve-id <ID>".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let id = args[0]
                 .parse::<u64>()
@@ -132,13 +159,11 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-tuple",
-        "Retrieve a tuple by subject, predicate, and object (Usage: /retrieve-tuple <subject> <predicate> <object>)",
+        "<subject> <predicate> <object>",
+        "Retrieve a tuple by subject, predicate, and object",
         Box::new(|ctx, args| {
             if args.len() < 3 {
-                ctx.ui
-                    .messages
-                    .push("Usage: /retrieve-tuple <subject> <predicate> <object>".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let tuple = ctx.kb.retrieve_tuple(args[0], args[1], args[2])?;
             ctx.ui.messages.push(format!("Tuple found: {}", tuple));
@@ -148,13 +173,11 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-subject",
-        "Retrieve all IDs for a specific subject (Usage: /retrieve-subject <subject>)",
+        "<subject>",
+        "Retrieve all IDs for a specific subject",
         Box::new(|ctx, args| {
             if args.is_empty() {
-                ctx.ui
-                    .messages
-                    .push("Usage: /retrieve-subject <subject>".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let ids = ctx.kb.retrieve_by_subject(args[0])?;
             let msg = if ids.is_empty() {
@@ -169,13 +192,11 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-predicate",
-        "Retrieve all IDs for a specific predicate (Usage: /retrieve-predicate <predicate>)",
+        "<predicate>",
+        "Retrieve all IDs for a specific predicate",
         Box::new(|ctx, args| {
             if args.is_empty() {
-                ctx.ui
-                    .messages
-                    .push("Usage: /retrieve-predicate <predicate>".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let ids = ctx.kb.retrieve_by_predicate(args[0])?;
             let msg = if ids.is_empty() {
@@ -190,13 +211,11 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-object",
-        "Retrieve all IDs for a specific object (Usage: /retrieve-object <object>)",
+        "<object>",
+        "Retrieve all IDs for a specific object",
         Box::new(|ctx, args| {
             if args.is_empty() {
-                ctx.ui
-                    .messages
-                    .push("Usage: /retrieve-object <object>".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let ids = ctx.kb.retrieve_by_object(args[0])?;
             let msg = if ids.is_empty() {
@@ -211,13 +230,11 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "retrieve-multiple",
-        "Retrieve multiple tuples by IDs (Usage: /retrieve-multiple <id1> <id2> ...)",
+        "<id1> <id2> ...",
+        "Retrieve multiple tuples by IDs",
         Box::new(|ctx, args| {
             if args.is_empty() {
-                ctx.ui
-                    .messages
-                    .push("Usage: /retrieve-multiple <id1> <id2> ...".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let parsed_ids: Vec<u64> = args
                 .iter()
@@ -231,7 +248,8 @@ pub fn get_default_registry() -> CommandRegistry {
 
     registry.register(
         "add",
-        "Add a new tuple to the Knowledge Base (Usage: /add <subject> <predicate> <object>)",
+        "<subject> [not] <predicate> <object>",
+        "Add a new tuple to the Knowledge Base",
         Box::new(|ctx, mut args| {
             let mut confidence = 1.0;
             if args.len() > 1 && args[1] == "not" {
@@ -239,10 +257,7 @@ pub fn get_default_registry() -> CommandRegistry {
                 args.remove(1);
             }
             if args.len() != 3 {
-                ctx.ui
-                    .messages
-                    .push("Usage: /add <subject> [not] <predicate> <object>".to_string());
-                return Ok(());
+                return Err(UsageError.into());
             }
             let tuple = Tuple::new(args[0], args[1], args[2], confidence);
             ctx.kb.store_tuple(&tuple).context("Error adding tuple")?;
