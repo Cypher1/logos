@@ -1,6 +1,5 @@
-use crate::kb::{KB, Tuple};
+use crate::kb::{KB, Tuple, TupleID};
 use crate::ui::LogosUI;
-
 use anyhow::{Context, Result, bail};
 use thiserror::Error;
 
@@ -76,9 +75,23 @@ impl<'a, 'b> AppContext<'a, 'b> {
 
     pub fn execute(&mut self, name: &str, parts: Vec<&str>) -> Result<()> {
         let Some(cmd) = self.registry.get(name) else {
-            bail!("Unknown command: /{}", name)
+            bail!("Unknown command")
         };
         cmd(self, parts)
+    }
+
+    pub fn print_tuples_from_id(&mut self, ids: impl IntoIterator<Item = TupleID>) -> Result<()> {
+        let ids: Vec<_> = ids.into_iter().collect();
+        self.ui.messages.push(if ids.is_empty() {
+            "No subj found.".to_string()
+        } else {
+            "Found:".to_string()
+        });
+        let ts = self.kb.retrieve_multiple_by_ids(ids)?;
+        let mut strs: Vec<String> = ts.into_iter().map(|t| format!("  {}", t)).collect();
+        strs.sort();
+        self.ui.messages.extend(strs);
+        Ok(())
     }
 }
 
@@ -88,21 +101,19 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "help",
         "",
-        "Show available commands and their descriptions",
+        "List commands",
         Box::new(|ctx, _args| {
             let entries = ctx.registry.list_commands();
-            let mut help_msg = String::from("Available commands:\n");
+            ctx.ui.messages.push(String::from("Commands:\n"));
             for (name, args, desc) in entries {
-                // Format: /command <args> - description
                 let args_str = if args.is_empty() {
                     "".to_string()
                 } else {
                     args
                 };
-                help_msg.push_str(&format!("  /{:<15} {} - {}\n", name, args_str, desc));
+                let cmd = format!("/{} {}", name, args_str);
+                ctx.ui.messages.push(format!("  {:<30} - {}", cmd, desc));
             }
-
-            ctx.ui.messages.push(help_msg);
             Ok(())
         }),
     );
@@ -110,157 +121,99 @@ pub fn get_default_registry() -> CommandRegistry {
     registry.register(
         "clear",
         "",
-        "Clear the chat history",
+        "Clear chat",
         Box::new(|ctx, _args| {
             ctx.ui.messages.clear();
-            ctx.ui.messages.push("Chat cleared.".to_string());
+            ctx.ui.messages.push("Cleared.".to_string());
             Ok(())
         }),
     );
 
     registry.register(
-        "kb",
-        "",
-        "Show Knowledge Base update status",
-        Box::new(|ctx, _args| {
-            let status = format!("KB updated at {:?}", std::time::SystemTime::now());
-            ctx.ui.system_state.push_str(&format!("\n{}", status));
-            ctx.ui
-                .messages
-                .push(format!("Knowledge Base Status: {}", status));
-            Ok(())
-        }),
-    );
-
-    registry.register(
-        "retrieve-id",
-        "<ID>",
-        "Retrieve a tuple by its unique ID",
-        Box::new(|ctx, args| {
-            if args.is_empty() {
-                return Err(UsageError.into());
-            }
-            let id = args[0]
-                .parse::<u64>()
-                .map_err(|_| anyhow::anyhow!("Invalid ID format"))?;
-            match ctx.kb.retrieve_by_id(id)? {
-                Some(tuple) => {
-                    ctx.ui.messages.push(format!("Tuple found: {}", tuple));
-                }
-                None => {
-                    ctx.ui
-                        .messages
-                        .push("No tuple found with that ID.".to_string());
-                }
-            }
-            Ok(())
-        }),
-    );
-
-    registry.register(
-        "retrieve-tuple",
-        "<subject> <predicate> <object>",
-        "Retrieve a tuple by subject, predicate, and object",
+        "check",
+        "<subj> <pred> <obj>",
+        "Get full tuple",
         Box::new(|ctx, args| {
             if args.len() < 3 {
                 return Err(UsageError.into());
             }
-            let tuple = ctx.kb.retrieve_tuple(args[0], args[1], args[2])?;
-            ctx.ui.messages.push(format!("Tuple found: {}", tuple));
+            let t = ctx.kb.retrieve_tuple(args[0], args[1], args[2])?;
+            ctx.ui.messages.push(format!("Found: {}", t));
             Ok(())
         }),
     );
 
     registry.register(
-        "retrieve-subject",
-        "<subject>",
-        "Retrieve all IDs for a specific subject",
+        "find",
+        "<entity>",
+        "Get by subj/obj/pred",
+        Box::new(|ctx, args| {
+            if args.is_empty() {
+                return Err(UsageError.into());
+            }
+            let mut ids = ctx.kb.retrieve_by_subject(args[0])?;
+            let ids2 = ctx.kb.retrieve_by_predicate(args[0])?;
+            let ids3 = ctx.kb.retrieve_by_object(args[0])?;
+            ids = ids.union(&ids2).cloned().collect();
+            ids = ids.union(&ids3).cloned().collect();
+            ctx.print_tuples_from_id(ids)
+        }),
+    );
+
+    registry.register(
+        "subj",
+        "<subj>",
+        "Get by subject",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 return Err(UsageError.into());
             }
             let ids = ctx.kb.retrieve_by_subject(args[0])?;
-            let msg = if ids.is_empty() {
-                "No tuples found for subject.".to_string()
-            } else {
-                format!("Found IDs: {:#?}", ids)
-            };
-            ctx.ui.messages.push(msg);
-            Ok(())
+            ctx.print_tuples_from_id(ids)
         }),
     );
 
     registry.register(
-        "retrieve-predicate",
-        "<predicate>",
-        "Retrieve all IDs for a specific predicate",
+        "pred",
+        "<pred>",
+        "Get by predicate",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 return Err(UsageError.into());
             }
             let ids = ctx.kb.retrieve_by_predicate(args[0])?;
-            let msg = if ids.is_empty() {
-                "No tuples found for predicate.".to_string()
-            } else {
-                format!("Found IDs: {:#?}", ids)
-            };
-            ctx.ui.messages.push(msg);
-            Ok(())
+            ctx.print_tuples_from_id(ids)
         }),
     );
 
     registry.register(
-        "retrieve-object",
-        "<object>",
-        "Retrieve all IDs for a specific object",
+        "obj",
+        "<obj>",
+        "Get by object",
         Box::new(|ctx, args| {
             if args.is_empty() {
                 return Err(UsageError.into());
             }
             let ids = ctx.kb.retrieve_by_object(args[0])?;
-            let msg = if ids.is_empty() {
-                "No tuples found for object.".to_string()
-            } else {
-                format!("Found IDs: {:#?}", ids)
-            };
-            ctx.ui.messages.push(msg);
-            Ok(())
-        }),
-    );
-
-    registry.register(
-        "retrieve-multiple",
-        "<id1> <id2> ...",
-        "Retrieve multiple tuples by IDs",
-        Box::new(|ctx, args| {
-            if args.is_empty() {
-                return Err(UsageError.into());
-            }
-            let parsed_ids: Vec<u64> = args
-                .iter()
-                .map(|s| s.parse::<u64>())
-                .collect::<Result<Vec<_>, _>>()?;
-            let tuples = ctx.kb.retrieve_multiple_by_ids(&parsed_ids[..])?;
-            ctx.ui.messages.push(format!("Found tuples: {:#?}", tuples));
-            Ok(())
+            ctx.print_tuples_from_id(ids)
         }),
     );
 
     registry.register(
         "add",
-        "<subject> [not] <predicate> <object>",
-        "Add a new tuple to the Knowledge Base",
+        "<subj> [not] <pred> <obj>",
+        "Add tuple",
         Box::new(|ctx, mut args| {
-            let mut confidence = 1.0;
+            let mut conf = 1.0;
             if args.len() > 1 && args[1] == "not" {
-                confidence = 0.0;
+                conf = 0.0;
                 args.remove(1);
             }
             if args.len() != 3 {
                 return Err(UsageError.into());
             }
-            let tuple = Tuple::new(args[0], args[1], args[2], confidence);
-            ctx.kb.store_tuple(&tuple).context("Error adding tuple")?;
+            let tuple = Tuple::new(args[0], args[1], args[2], conf);
+            ctx.kb.store_tuple(&tuple).context("Add fail")?;
             ctx.ui.messages.push(format!("+ {}", tuple));
             Ok(())
         }),

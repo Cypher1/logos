@@ -187,7 +187,7 @@ impl<'a> LogosUI<'a> {
 
         let paragraph = Paragraph::new(text)
             .block(Block::default().borders(Borders::NONE))
-            .wrap(Wrap { trim: true })
+            .wrap(Wrap { trim: false })
             .scroll((self.chat_scroll as u16, 0));
 
         frame.render_widget(paragraph, inner_area);

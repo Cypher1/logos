@@ -159,16 +159,16 @@ impl KB {
     }
 
     /// Retrieves multiple tuples from the knowledge base by their IDs.
-    pub fn retrieve_multiple_by_ids<'a>(
+    pub fn retrieve_multiple_by_ids(
         &self,
-        ids: impl IntoIterator<Item = &'a TupleID>,
+        ids: impl IntoIterator<Item = TupleID>,
     ) -> Result<Vec<Tuple>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TUPLES_TABLE)?;
         let mut results = Vec::new();
 
         for id in ids {
-            if let Some(row) = table.get(*id)? {
+            if let Some(row) = table.get(id)? {
                 let tuple: Tuple = serde_json::from_slice(row.value())?;
                 results.push(tuple);
             }
