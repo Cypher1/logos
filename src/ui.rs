@@ -181,13 +181,16 @@ impl<'a> LogosUI<'a> {
 
         let inner_area = area.inner(Margin::new(1, 1));
         let inner_height = inner_area.height as usize;
-        let total_lines = self.messages.len();
-        let max_scroll = total_lines.saturating_sub(inner_height);
-        self.chat_scroll = self.chat_scroll.min(max_scroll);
 
         let paragraph = Paragraph::new(text)
             .block(Block::default().borders(Borders::NONE))
-            .wrap(Wrap { trim: false })
+            .wrap(Wrap { trim: false });
+
+        let total_lines = paragraph.line_count(inner_area.width);
+        let max_scroll = total_lines.saturating_sub(inner_height);
+        self.chat_scroll = self.chat_scroll.min(max_scroll);
+
+        let paragraph = paragraph
             .scroll((self.chat_scroll as u16, 0));
 
         frame.render_widget(paragraph, inner_area);
