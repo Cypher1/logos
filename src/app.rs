@@ -203,6 +203,11 @@ where
                 }
             }
             event::Event::Key(key) => {
+                if self.ui.copy_mode {
+                    self.ui.copy_mode = false;
+                    return Ok(InputSignal::Continue);
+                }
+
                 if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('c') {
                     return Ok(InputSignal::Break);
                 }

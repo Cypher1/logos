@@ -50,6 +50,8 @@ pub struct LogosUI<'a> {
     pub input_area: Rect,
     /// Text area for input
     pub input_textarea: ratatui_textarea::TextArea<'a>,
+    /// Mode copy mode (shows messages only, no UI metadata)
+    pub copy_mode: bool,
 }
 
 impl<'a> LogosUI<'a> {
@@ -74,11 +76,17 @@ impl<'a> LogosUI<'a> {
             planning_area: Rect::default(),
             input_area: Rect::default(),
             input_textarea: ratatui_textarea::TextArea::default(),
+            copy_mode: false,
         }
     }
 
     /// Render the complete UI layout
     pub fn render(&mut self, frame: &mut Frame) {
+        if self.copy_mode {
+            self.render_copy_mode(frame);
+            return;
+        }
+
         // Define the main layout with 3 horizontal areas:
         // 1. Top status bar
         // 2. Main content area (chat + panels)
@@ -112,7 +120,7 @@ impl<'a> LogosUI<'a> {
 
     /// Render the main content area with all panels
     fn render_main_content(&mut self, frame: &mut Frame, area: Rect) {
-        // Split main area horizontally into 3 panels
+        // Split main area horizontally into 2 panels
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -190,8 +198,7 @@ impl<'a> LogosUI<'a> {
         let max_scroll = total_lines.saturating_sub(inner_height);
         self.chat_scroll = self.chat_scroll.min(max_scroll);
 
-        let paragraph = paragraph
-            .scroll((self.chat_scroll as u16, 0));
+        let paragraph = paragraph.scroll((self.chat_scroll as u16, 0));
 
         frame.render_widget(paragraph, inner_area);
 
@@ -383,7 +390,27 @@ impl<'a> LogosUI<'a> {
         // Draw the textarea widget inside the input area
         let mut textarea = self.input_textarea.clone();
         textarea.set_block(block);
-        textarea.set_placeholder_text(" /help · Ctrl+C quit");
+        textarea.set_placeholder_text("/help · Ctrl+C quit");
         frame.render_widget(&textarea, area);
+    }
+
+    /// Render the UI in copy mode (messages only - no borders or metadata for easy selection)
+    fn render_copy_mode(&mut self, frame: &mut Frame) {
+        // Purely render the messages. No block/border so text is easily selectable in terminal.
+        let text: Text = self
+            .messages
+            .iter()
+            .flat_map(|msg| {
+                msg.lines()
+                    .map(|line| Line::from(vec![Span::raw(line.to_string())]))
+            })
+            .collect();
+
+        let inner_area = frame.area().inner(Margin::new(1, 1));
+        let paragraph = Paragraph::new(text)
+            .block(Block::default().borders(Borders::NONE))
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, inner_area);
     }
 }

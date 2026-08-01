@@ -12,6 +12,7 @@ pub enum CommandError {
     #[error("Usage")]
     UsageError,
 }
+
 use CommandError::*;
 
 pub struct CommandRegistry {
@@ -104,7 +105,7 @@ pub fn get_default_registry() -> CommandRegistry {
         "List commands",
         Box::new(|ctx, _args| {
             let entries = ctx.registry.list_commands();
-            ctx.ui.messages.push(String::from("Commands:\n"));
+            ctx.ui.messages.push(String::from("Commands:"));
             for (name, args, desc) in entries {
                 let args_str = if args.is_empty() {
                     "".to_string()
@@ -114,6 +115,16 @@ pub fn get_default_registry() -> CommandRegistry {
                 let cmd = format!("/{} {}", name, args_str);
                 ctx.ui.messages.push(format!("  {:<30} - {}", cmd, desc));
             }
+            Ok(())
+        }),
+    );
+
+    registry.register(
+        "copy",
+        "",
+        "Toggle Copy Mode",
+        Box::new(|ctx, _args| {
+            ctx.ui.copy_mode = !ctx.ui.copy_mode;
             Ok(())
         }),
     );

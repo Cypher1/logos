@@ -3,7 +3,7 @@
 ## LLM features
 -[ ] Add compaction
 -[ ] Add tab completion UI
--[ ] Add copy/paste support
+-[x] Add copy/paste support
 -[ ] Add tool use
 -[ ] Add tool for LLM to start planning
 -[ ] Add remote control via Discord
