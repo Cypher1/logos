@@ -214,6 +214,18 @@ where
                 if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('z') {
                     return Ok(InputSignal::Suspend);
                 }
+                if key.modifiers == KeyModifiers::CONTROL
+                    && (key.code == KeyCode::Tab || key.code == KeyCode::Char('t'))
+                {
+                    let next_focus = match self.ui.focus {
+                        UIFocus::Input => UIFocus::Chat,
+                        UIFocus::Chat => UIFocus::KB,
+                        UIFocus::KB => UIFocus::Planning,
+                        UIFocus::Planning => UIFocus::Input,
+                    };
+                    self.ui.focus = next_focus;
+                    return Ok(InputSignal::Continue);
+                }
 
                 match self.ui.focus {
                     UIFocus::Input => match key.code {
@@ -266,15 +278,7 @@ where
                             }
                         },
                         KeyCode::Tab => {
-                            if key.modifiers == KeyModifiers::CONTROL {
-                                let next_focus = match self.ui.focus {
-                                    UIFocus::Input => UIFocus::Chat,
-                                    UIFocus::Chat => UIFocus::KB,
-                                    UIFocus::KB => UIFocus::Planning,
-                                    UIFocus::Planning => UIFocus::Input,
-                                };
-                                self.ui.focus = next_focus;
-                            } else if self.ui.focus == UIFocus::Input {
+                            if self.ui.focus == UIFocus::Input {
                                 let current_text = self.ui.input_textarea.lines().join("\n");
                                 if let Some(command_str) = current_text.strip_prefix(COMMAND_PREFIX)
                                 {
@@ -308,9 +312,6 @@ where
                         }
                     },
                     UIFocus::Chat => match key.code {
-                        KeyCode::Tab => {
-                            self.ui.focus = UIFocus::KB;
-                        }
                         KeyCode::Up => {
                             self.ui.chat_scroll = self.ui.chat_scroll.saturating_sub(1);
                         }
@@ -320,24 +321,15 @@ where
                         _ => {}
                     },
                     UIFocus::KB => match key.code {
-                        KeyCode::Tab => {
-                            self.ui.focus = UIFocus::Planning;
-                        }
                         KeyCode::Up => {
                             self.ui.kb_scroll = self.ui.kb_scroll.saturating_sub(1);
                         }
                         KeyCode::Down => {
                             self.ui.kb_scroll = self.ui.kb_scroll.saturating_add(1);
                         }
-                        KeyCode::Char('/') | KeyCode::Char('r') => {
-                            self.update_kb_view()?;
-                        }
                         _ => {}
                     },
                     UIFocus::Planning => match key.code {
-                        KeyCode::Tab => {
-                            self.ui.focus = UIFocus::Input;
-                        }
                         KeyCode::Up => {
                             self.ui.planning_scroll = self.ui.planning_scroll.saturating_sub(1);
                         }
