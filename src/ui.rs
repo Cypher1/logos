@@ -8,6 +8,7 @@ use ratatui::widgets::{
     Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
 };
 use ratatui::*;
+use tui_markdown::from_str;
 
 /// UI Panel Focus Options
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,14 +179,8 @@ impl<'a> LogosUI<'a> {
         frame.render_widget(block, area);
 
         // Display chat messages
-        let text: Text = self
-            .messages
-            .iter()
-            .flat_map(|msg| {
-                msg.lines()
-                    .map(|line| Line::from(vec![Span::raw(line.to_string())]))
-            })
-            .collect();
+        let all_lines = &self.messages.join("\n\n");
+        let text = from_str(all_lines);
 
         let inner_area = area.inner(Margin::new(1, 1));
         let inner_height = inner_area.height as usize;
