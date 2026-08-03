@@ -1,8 +1,11 @@
 //! Knowledge Base module for Logos, using redb as an embedded database.
-//!
 //! This module provides the core data structures and functionality for
 //! storing and retrieving knowledge base tuples using redb.
-//!
+
+pub mod inference;
+pub mod parser;
+pub mod query;
+pub mod rule;
 #[cfg(test)]
 mod tests;
 pub mod tuple;
@@ -151,8 +154,8 @@ impl KB {
         let mut results = HashSet::new();
 
         for row in table.get(format!("{}", entity).as_str())? {
-            let tuple: TupleID = row?.value();
-            results.insert(tuple);
+            let tuple_id: u64 = row?.value();
+            results.insert(tuple_id);
         }
 
         Ok(results)
