@@ -6,12 +6,12 @@ pub mod inference;
 pub mod parser;
 pub mod query;
 pub mod rule;
-#[cfg(test)]
-mod tests;
 pub mod tuple;
 
-pub use tuple::Ent;
-pub use tuple::{Tuple, TupleID};
+#[cfg(test)]
+mod tests;
+
+pub use tuple::{Ent, Slot, Tuple, TupleID, TupleTemplate};
 
 use anyhow::{Context, Result};
 use redb::{Database, MultimapTableDefinition, ReadableDatabase, ReadableTable, TableDefinition};

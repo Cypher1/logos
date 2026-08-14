@@ -34,13 +34,13 @@ impl<'a> InferenceEngine<'a> {
 
     /// Attempts to unify a template tuple with a concrete fact or another template.
     /// Returns a set of bindings if successful, otherwise an empty map.
-    pub fn unify(&self, template: &TupleTemplate, target: &Tuple) -> Option<Bindings> {
+    pub fn unify(&self, template: &TupleTemplate, target: &impl Unifiable) -> Option<Bindings> {
         let mut bindings: HashMap<String, Ent> = HashMap::new();
 
         for (t_slot, target_slot) in [
-            (&template.subject, &target.subject),
-            (&template.predicate, &target.predicate),
-            (&template.object, &target.object),
+            (&template.subject, &target.subject()),
+            (&template.predicate, &target.predicate()),
+            (&template.object, &target.object()),
         ]
         .iter()
         {
@@ -51,9 +51,9 @@ impl<'a> InferenceEngine<'a> {
                             return None;
                         }
                     } else {
-                        // Since 'target' is &Tuple, 'ent' here is &Ent.
+                        // Since 'target' is Unifiable, 'ent' here is &Slot.
                         // We need to clone the inner value.
-                        bindings.insert(name.clone(), (*ent).clone());
+                        bindings.insert(name.clone(), ent.clone());
                     }
                 }
                 (Slot::Constant(e1), e2) => {
