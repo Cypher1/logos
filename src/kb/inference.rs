@@ -3,7 +3,7 @@
 
 use crate::kb::query::Query;
 use crate::kb::rule::Rule;
-use crate::kb::tuple::{Ent, Slot, Tuple, TupleTemplate};
+use crate::kb::tuple::{Ent, Slot, Tuple, TupleTemplate, Unifiable};
 use std::collections::HashMap;
 
 /// A mapping from placeholder names (e.g., "?x") to actual entities.

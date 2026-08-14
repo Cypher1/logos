@@ -46,9 +46,9 @@ impl std::fmt::Display for Ent {
 /// Quantifiers for rule application to interpret placeholder scope.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Quantifier {
-    /// Universal ($\forall$): Any substitution that satisfies the premise results in a conclusion.
+    /// Universal ($\\forall$): Any substitution that satisfies the premise results in a conclusion.
     Universal,
-    /// Existential ($\exists$): A conclusion is valid if there exists at least one substitution satisfying the premise.
+    /// Existential ($\\exists$): A conclusion is valid if there exists at least one substitution satisfying the premise.
     Existential,
 }
 
@@ -125,6 +125,12 @@ impl std::fmt::Display for Slot {
     }
 }
 
+pub trait Unifiable {
+    fn subject(&self) -> Ent;
+    fn predicate(&self) -> Ent;
+    fn object(&self) -> Ent;
+}
+
 /// A tuple representation that supports concrete facts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Tuple {
@@ -132,6 +138,12 @@ pub struct Tuple {
     pub predicate: Ent,
     pub object: Ent,
     pub confidence: f32,
+}
+
+impl Unifiable for Tuple {
+    fn subject(&self) -> Ent { self.subject.clone() }
+    fn predicate(&self) -> Ent { self.predicate.clone() }
+    fn object(&self) -> Ent { self.object.clone() }
 }
 
 impl Tuple {
@@ -203,6 +215,12 @@ pub struct TupleTemplate {
     pub predicate: Slot,
     pub object: Slot,
     pub confidence: f32,
+}
+
+impl Unifiable for TupleTemplate {
+    fn subject(&self) -> Ent { self.subject.clone().into() }
+    fn predicate(&self) -> Ent { self.predicate.clone().into() }
+    fn object(&self) -> Ent { self.object.clone().into() }
 }
 
 impl TupleTemplate {
